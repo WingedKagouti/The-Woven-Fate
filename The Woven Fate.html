@@ -1,0 +1,2761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Woven Fate</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; height:100%; }
+  body { font-family: Georgia, 'Times New Roman', serif; }
+  button { font-family: inherit; }
+  textarea, input { font-family: inherit; }
+  ::-webkit-scrollbar { width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb { background: var(--bdrM); border-radius:5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  a { color: inherit; }
+
+  #app { display:flex; flex-direction:column; height:100vh; background:var(--bg); color:var(--text); overflow:hidden; }
+
+  .hdr { padding:10px 16px; border-bottom:1px solid var(--bdr); background:var(--bgH); flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
+  .sbar { display:flex; align-items:center; gap:8px; padding:6px 14px; border-bottom:1px solid var(--bdr); background:var(--bgS); flex-shrink:0; flex-wrap:wrap; row-gap:6px; }
+
+  .smbtn { padding:5px 12px; border-radius:4px; font-size:12px; letter-spacing:0.5px; background:transparent; transition:all .2s; outline:none; white-space:nowrap; cursor:pointer; border:1px solid var(--bdrC); color:var(--acc); }
+  .smbtn:disabled { cursor:not-allowed; border-color:var(--bdrM); color:var(--accLo); opacity:0.5; }
+
+  .toggle-theme-btn { background:none; border:1px solid var(--bdrM); border-radius:4px; color:var(--textM); font-size:11px; cursor:pointer; letter-spacing:1px; padding:3px 8px; outline:none; white-space:nowrap; }
+
+  .link-btn { background:none; border:none; font-family: Georgia, serif; cursor:pointer; letter-spacing:1px; text-transform:uppercase; padding:3px 0; outline:none; white-space:nowrap; }
+
+  textarea, input[type="text"] { background:var(--iBg); border:1px solid var(--bdrM); border-radius:4px; padding:9px 12px; color:var(--text); font-size:13px; outline:none; }
+
+  .panel { padding:12px 16px; border-bottom:1px solid var(--bdr); background:var(--bgCard); flex-shrink:0; font-size:12px; display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto; }
+  .panel-label { color:var(--textD); letter-spacing:1.5px; text-transform:uppercase; font-size:10px; margin-bottom:4px; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.65); display:flex; align-items:center; justify-content:center; padding:24px; z-index:60; }
+  .modal-box { background:var(--bgCard); border-radius:8px; padding:22px; max-width:520px; width:100%; max-height:85vh; overflow-y:auto; display:flex; flex-direction:column; gap:14px; }
+
+  .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+
+  .fade-btn { border-radius:4px; cursor:pointer; transition:all .2s; outline:none; }
+
+  ::placeholder { color: var(--textD); opacity:0.8; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+
+/* ============================== CONSTANTS & PROMPTS ============================== */
+
+const OUTCOMES = ["success","failure","mitigated_success","mitigated_failure"];
+const OUTCOME_META = {
+  success:           {label:"Victory",       symbol:"\u2726",color:"#4a9e1a",desc:"Complete triumph"},
+  failure:           {label:"Defeat",         symbol:"\u2717",color:"#c94040",desc:"Total failure"},
+  mitigated_success: {label:"Costly Victory", symbol:"\u25c8",color:"#1a8a9e",desc:"Won, but at a price"},
+  mitigated_failure: {label:"Near Miss",      symbol:"\u25c7",color:"#c87820",desc:"Failed, but not broken"},
+};
+const BTN_META = {
+  success:{label:"Fortune Smiles", c_dark:"#a3e635", c_light:"#4a8a10"},
+  failure:{label:"Fate Turns Away",c_dark:"#f87171", c_light:"#b83030"},
+  fate:   {label:"The Weave",      c_dark:"#c084fc", c_light:"#7030b0"},
+};
+const MOODS = [
+  {key:"tragic",     label:"Tragic",     hint:"Unrelenting, tragic"},
+  {key:"dark",       label:"Dark",       hint:"Grim and weighty"},
+  {key:"neutral",    label:"Neutral",    hint:"Light and shadow"},
+  {key:"whimsical",  label:"Whimsical",  hint:"Warm undertones"},
+  {key:"comedic",    label:"Comedic",    hint:"Funny and absurd"},
+  {key:"romantic",   label:"Romantic",   hint:"Passion and longing"},
+  {key:"mysterious", label:"Mysterious", hint:"Secrets and unease"},
+  {key:"heroic",     label:"Heroic",     hint:"Grand and triumphant"},
+];
+const SETTINGS = [
+  {key:"contemporary",  label:"Contemporary",  icon:"\u25cc"},
+  {key:"urban_fantasy", label:"Urban Fantasy", icon:"\ud83d\udf03"},
+  {key:"high_fantasy",  label:"High Fantasy",  icon:"\u2694"},
+  {key:"folklore",      label:"Folk & Myth",   icon:"\u263d"},
+  {key:"steampunk",     label:"Steampunk",     icon:"\u2699"},
+  {key:"science_fiction",label:"Sci-Fi",       icon:"\u25ce"},
+  {key:"western",       label:"Western",       icon:"\u2600"},
+  {key:"historical",    label:"Historical",    icon:"\u231b"},
+  {key:"school",        label:"School & Academy",icon:"\ud83c\udf93"},
+];
+const ENGINES = [
+  {key:"story_driven", label:"Story-Driven",     icon:"\u2756"},
+  {key:"detective",    label:"Detective & Mystery",icon:"\ud83d\udd0d"},
+  {key:"crime",        label:"Crime",            icon:"\ud83d\udde1"},
+  {key:"spy",          label:"Spy & Espionage",  icon:"\ud83d\udd76"},
+  {key:"action",       label:"Action",           icon:"\ud83d\udca5"},
+  {key:"adventure",    label:"Adventure",        icon:"\ud83d\uddfa"},
+  {key:"superhero",    label:"Superhero",        icon:"\u26a1"},
+  {key:"gothic_horror", label:"Gothic Horror",   icon:"\ud83d\udd78"},
+  {key:"cosmic_horror", label:"Cosmic Horror",   icon:"\u2736"},
+  {key:"monster_horror", label:"Monster Horror", icon:"\u2620"},
+  {key:"swashbuckling", label:"Swashbuckling",   icon:"\u2693"},
+  {key:"political",    label:"Political Intrigue",icon:"\u265b"},
+];
+const GENDERS = [
+  {key:"male",      label:"Male"},
+  {key:"female",    label:"Female"},
+  {key:"other",     label:"Other"},
+  {key:"undefined", label:"Undefined"},
+];
+const MOOD_SYSTEM = {
+  tragic:     "unrelenting darkness and tragedy \u2014 no redemption, no levity, consequences are permanent and brutal",
+  dark:       "grim seriousness with moral ambiguity and weighty consequences",
+  neutral:    "a balanced mix of tension and relief, light and shadow in equal measure",
+  whimsical:  "warm and playful with light-hearted humour woven through the adventure",
+  comedic:    "irreverent and funny \u2014 lean into absurdity, wit and self-aware humour",
+  romantic:   "charged with passion, longing, and emotional connection \u2014 relationships and chemistry drive the stakes",
+  mysterious: "thick with secrets, slow reveals, and atmospheric unease \u2014 intrigue over outright dread",
+  heroic:     "grand and triumphant \u2014 noble purpose, larger-than-life stakes, courage rewarded",
+};
+const ENGINE_SYSTEM = {
+  story_driven: "let the plot shape emerge naturally from the setting and mood, without favouring any specific genre conventions",
+  detective:    "an investigation-driven mystery \u2014 clues, suspects, deduction, and a truth being slowly uncovered",
+  crime:        "a criminal underworld story \u2014 heists, double-crosses, loyalty and betrayal among those outside the law",
+  spy:          "espionage and tradecraft \u2014 hidden agendas, covert operations, and danger behind a respectable facade",
+  action:       "escalating physical confrontation and competence under pressure \u2014 relentless momentum, set-piece conflicts",
+  adventure:    "exploration-driven pulp adventure \u2014 ruins, puzzles, danger as obstacle rather than confrontation",
+  superhero:    "heroic duty and power with responsibility \u2014 colorful antagonists, dramatic stakes, found-family or team dynamics where relevant",
+  gothic_horror:"dread, decay, and human-scale tragedy in a crumbling, oppressive atmosphere",
+  cosmic_horror:"incomprehensible scale and existential insignificance \u2014 sanity-fraying revelations",
+  monster_horror:"a hunted, cornered survival dynamic against a tangible, lethal threat",
+  swashbuckling:"daring derring-do, banter, duels, and bold escapades with a loyal crew or companions",
+  political:    "courts, factions, and alliances \u2014 danger through words and shifting power rather than violence; betrayal and leverage are the weapons, and this can encompass the politics and consequences of larger conflicts and wars",
+};
+const MAX_KEY=3, MAX_ITEMS=5, MAX_CHARS=12, MAX_COND=3;
+const HISTORY_LIMIT=20, HISTORY_KEEP=6, EVENTS_LIMIT=20, EVENTS_COLLAPSE=10;
+const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
+const SAVE_SIZE_LIMIT_BYTES=4800000;
+const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
+const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
+const APP_VERSION="v4.6";
+
+const API_CONFIG = {
+  defaultUrl: "https://api.anthropic.com/v1/messages",
+  model: "claude-sonnet-4-6",
+  maxTokens: 1000,
+};
+
+/* ---- Browser-side API target handling ----
+   Calls are made directly from the browser (no backend proxy), so the user
+   points the app at whatever endpoint they want \u2014 the real Anthropic API
+   with their own key, a self-hosted proxy, or anything else that speaks the
+   same /v1/messages shape \u2014 and supplies a matching key, or none at all if
+   the target doesn't require one. Multiple named targets can be saved side
+   by side and switched between; everything is persisted only in this
+   browser's localStorage and is never hardcoded in source. */
+const API_TARGETS_STORAGE_KEY = "woven_fate_api_targets";
+const ACTIVE_TARGET_STORAGE_KEY = "woven_fate_active_target_id";
+const LEGACY_API_KEY_STORAGE_KEY = "woven_fate_api_key"; // pre-multi-target, migrated on load
+
+function getStoredApiTargets(){
+  try{
+    const raw = window.localStorage.getItem(API_TARGETS_STORAGE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  }catch(e){ return []; }
+}
+function setStoredApiTargets(targets){
+  try{ window.localStorage.setItem(API_TARGETS_STORAGE_KEY, JSON.stringify(targets)); }catch(e){}
+}
+function getStoredActiveTargetId(){
+  try{ return window.localStorage.getItem(ACTIVE_TARGET_STORAGE_KEY) || ""; }
+  catch(e){ return ""; }
+}
+function setStoredActiveTargetId(id){
+  try{
+    if(id) window.localStorage.setItem(ACTIVE_TARGET_STORAGE_KEY, id);
+    else window.localStorage.removeItem(ACTIVE_TARGET_STORAGE_KEY);
+  }catch(e){}
+}
+/* One-time migration: an earlier version of this file stored a single bare
+   API key against the hardcoded Anthropic endpoint. If that's all we find,
+   turn it into the first saved target so nobody loses their key. */
+function migrateLegacyApiKeyIfNeeded(){
+  try{
+    const existing = getStoredApiTargets();
+    if(existing.length) return existing;
+    const legacyKey = window.localStorage.getItem(LEGACY_API_KEY_STORAGE_KEY);
+    if(!legacyKey) return existing;
+    const migrated = [{id:newId(), name:"Anthropic (default)", url:API_CONFIG.defaultUrl, key:legacyKey}];
+    setStoredApiTargets(migrated);
+    setStoredActiveTargetId(migrated[0].id);
+    window.localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY);
+    return migrated;
+  }catch(e){ return getStoredApiTargets(); }
+}
+
+/* ============================== PROVIDER REGISTRY ============================== */
+/* Different services speak completely different request/response shapes
+   (Anthropic's Messages API, OpenAI's Chat Completions, Google's Gemini
+   generateContent, ...). Each entry below knows how to build a request and
+   how to pull plain text (or an error) back out of that service's specific
+   response shape, so the rest of the app can keep calling one function and
+   just getting a string back, regardless of which service answered.
+
+   NOTE on defaults: the "defaultModel" values and guessed endpoint paths
+   are best-effort, current as of this writing, and shown only as
+   placeholders/fallbacks \u2014 model names in particular go stale quickly.
+   Anyone can always type an exact model name, or paste a full endpoint URL
+   (including its path) into the Service URL field, to override the guess. */
+
+function openAiCompatibleBuildRequest({apiKey,model,messages,system,maxTokens}){
+  const headers = {"Content-Type":"application/json"};
+  if(apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  const chatMessages = [
+    ...(system ? [{role:"system", content:system}] : []),
+    ...messages.map(m=>({role:m.role, content:m.content})),
+  ];
+  return {headers, body:{model, max_tokens:maxTokens, messages:chatMessages}};
+}
+function openAiCompatibleParseText(data){
+  const choice = data.choices && data.choices[0];
+  const content = choice && choice.message && choice.message.content;
+  return typeof content==="string" ? content : null;
+}
+function openAiCompatibleParseError(data){
+  if(!data || !data.error) return null;
+  const err = data.error;
+  const message = typeof err==="string" ? err : (err.message||JSON.stringify(err));
+  const type = (typeof err==="object" && (err.type||err.code)) || "unknown";
+  return {type:String(type), message};
+}
+
+const PROVIDERS = {
+  anthropic: {
+    id:"anthropic", label:"Anthropic (Claude)",
+    hostnames:["api.anthropic.com"],
+    defaultModel:"claude-sonnet-4-6",
+    buildUrl:(origin)=>`${origin}/v1/messages`,
+    buildRequest:({apiKey,model,messages,system,maxTokens})=>{
+      const headers = {
+        "Content-Type":"application/json",
+        "anthropic-version":"2023-06-01",
+        // Required by the Anthropic SDK/fetch calls when calling the API
+        // directly from a browser environment instead of through a backend.
+        "anthropic-dangerously-allow-browser":"true",
+      };
+      if(apiKey) headers["x-api-key"] = apiKey;
+      return {headers, body:{model, max_tokens:maxTokens, system, messages}};
+    },
+    parseText:(data)=> (data.content && data.content[0]) ? data.content[0].text : null,
+    parseError:(data)=> data.error ? {type:data.error.type||"unknown", message:data.error.message||"no details", raw:data.error} : null,
+  },
+  openai: {
+    id:"openai", label:"OpenAI (GPT)",
+    hostnames:["api.openai.com"],
+    defaultModel:"gpt-4.1",
+    buildUrl:(origin)=>`${origin}/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest,
+    parseText:openAiCompatibleParseText,
+    parseError:openAiCompatibleParseError,
+  },
+  gemini: {
+    id:"gemini", label:"Google Gemini",
+    hostnames:["generativelanguage.googleapis.com"],
+    defaultModel:"gemini-2.5-flash",
+    buildUrl:(origin,model)=>`${origin}/v1beta/models/${model}:generateContent`,
+    buildRequest:({apiKey,model,messages,system,maxTokens})=>{
+      const headers = {"Content-Type":"application/json"};
+      if(apiKey) headers["x-goog-api-key"] = apiKey;
+      const contents = messages.map(m=>({role: m.role==="assistant" ? "model" : "user", parts:[{text:m.content}]}));
+      const body = {contents, generationConfig:{maxOutputTokens:maxTokens}};
+      if(system) body.systemInstruction = {parts:[{text:system}]};
+      return {headers, body};
+    },
+    parseText:(data)=>{
+      const cand = data.candidates && data.candidates[0];
+      const parts = cand && cand.content && cand.content.parts;
+      if(!parts) return null;
+      return parts.map(p=>p.text||"").join("");
+    },
+    parseError:(data)=> data.error ? {type:data.error.status||"unknown", message:data.error.message||"no details", raw:data.error} : null,
+  },
+  groq: {
+    id:"groq", label:"Groq",
+    hostnames:["api.groq.com"],
+    defaultModel:"llama-3.3-70b-versatile",
+    buildUrl:(origin)=>`${origin}/openai/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+  mistral: {
+    id:"mistral", label:"Mistral",
+    hostnames:["api.mistral.ai"],
+    defaultModel:"mistral-large-latest",
+    buildUrl:(origin)=>`${origin}/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+  deepseek: {
+    id:"deepseek", label:"DeepSeek",
+    hostnames:["api.deepseek.com"],
+    defaultModel:"deepseek-chat",
+    buildUrl:(origin)=>`${origin}/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+  xai: {
+    id:"xai", label:"xAI (Grok)",
+    hostnames:["api.x.ai"],
+    defaultModel:"grok-4",
+    buildUrl:(origin)=>`${origin}/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+  openrouter: {
+    id:"openrouter", label:"OpenRouter",
+    hostnames:["openrouter.ai"],
+    defaultModel:"anthropic/claude-sonnet-4",
+    buildUrl:(origin)=>`${origin}/api/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+  together: {
+    id:"together", label:"Together AI",
+    hostnames:["api.together.xyz"],
+    defaultModel:"meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    buildUrl:(origin)=>`${origin}/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+  fireworks: {
+    id:"fireworks", label:"Fireworks AI",
+    hostnames:["api.fireworks.ai"],
+    defaultModel:"accounts/fireworks/models/llama-v3p1-70b-instruct",
+    buildUrl:(origin)=>`${origin}/inference/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+  openai_compatible: {
+    id:"openai_compatible", label:"Other (OpenAI-compatible \u2014 Ollama, LM Studio, custom proxy, etc.)",
+    hostnames:[], // never auto-detected by hostname; only chosen manually
+    defaultModel:"",
+    buildUrl:(origin)=>`${origin}/v1/chat/completions`,
+    buildRequest:openAiCompatibleBuildRequest, parseText:openAiCompatibleParseText, parseError:openAiCompatibleParseError,
+  },
+};
+const PROVIDER_LIST = Object.values(PROVIDERS);
+
+function isLocalOrIpHost(hostname){
+  if(!hostname) return true;
+  if(hostname==="localhost") return true;
+  if(/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) return true; // IPv4
+  if(hostname==="::1" || hostname.startsWith("[")) return true; // IPv6
+  return false;
+}
+/* Returns a provider id guessed from the URL's hostname, or null if it's a
+   localhost/IP address (ambiguous \u2014 caller must ask the user) or simply
+   doesn't match any known service (falls back to the generic OpenAI-
+   compatible option, still requiring confirmation via the dropdown). */
+function detectProviderId(url){
+  const host = safeHostname(url);
+  if(isLocalOrIpHost(host)) return null;
+  for(const p of PROVIDER_LIST){
+    if(p.hostnames.some(h => host===h || host.endsWith("."+h))) return p.id;
+  }
+  return null;
+}
+function resolveEndpointUrl(baseUrl, providerDef, model){
+  let u;
+  try{ u = new URL(baseUrl); }catch(e){ return baseUrl; }
+  const hasPath = u.pathname && u.pathname!=="/";
+  if(hasPath) return baseUrl; // already a full endpoint \u2014 respected exactly as typed
+  return providerDef.buildUrl(u.origin.replace(/\/$/,""), model);
+}
+
+
+const D = {
+  bg:"#0c0a0d",       bgH:"rgba(0,0,0,0.55)",    bgS:"rgba(0,0,0,0.38)",
+  bgI:"rgba(0,0,0,0.62)",  bgCard:"rgba(18,10,16,0.92)", bgGenre:"rgba(20,12,8,0.65)",
+  text:"#e2d5bc",     textM:"#7a6448",   textD:"#5a4a32",  textP:"#8a9bb0",
+  acc:"#b8922a",      accHi:"#d4a83a",   accLo:"#3a2a18",
+  bdr:"#2a1f18",      bdrM:"#2e2218",    bdrC:"#3d2838",
+  nb:"#d4b87a",       ni:"#a8c0d6",
+  iBg:"rgba(255,255,255,0.04)",
+  pABg:"rgba(184,146,42,0.12)", pABdr:"#b8922a", pAClr:"#d4a83a",
+  gABg:"rgba(184,146,42,0.12)", gABdr:"#b8922a", gAClr:"#d4a83a",
+  fbBg:"rgba(18,10,16,0.92)",   fbBdr:"#3d2838", fbClr:"#9a8070", fbDim:"#2e2230",
+  think:"#5a4a32",    link:"#5a4a32",    newBtn:"#4a3a28", info:"#3a2a18",
+  delClr:"#c94040", cardBdr:"#2e2218", cardBdrH:"#5a3a1a",
+  keyClr:"#d4a83a", itemClr:"#a8c0d6", toolClr:"#9a8070", dlg:"#e8a87c",
+  charClr:"#c084fc", evClr:"#9a8070", actClr:"#d4a83a", bookClr:"#67e8f9",
+};
+const L = {
+  bg:"#f2ebe0",       bgH:"rgba(238,228,210,0.97)", bgS:"rgba(232,222,200,0.85)",
+  bgI:"rgba(232,222,200,0.95)", bgCard:"rgba(238,230,212,0.97)", bgGenre:"rgba(232,224,206,0.9)",
+  text:"#28180a",     textM:"#6a5830",   textD:"#8a7850",  textP:"#3a506a",
+  acc:"#8a5e0a",      accHi:"#6e4a08",   accLo:"#c0a868",
+  bdr:"#c4b080",      bdrM:"#b8a270",    bdrC:"#c8b078",
+  nb:"#7a4208",       ni:"#1a5070",
+  iBg:"rgba(0,0,0,0.035)",
+  pABg:"rgba(138,94,10,0.1)", pABdr:"#8a5e0a", pAClr:"#6e4a08",
+  gABg:"rgba(138,94,10,0.1)", gABdr:"#8a5e0a", gAClr:"#6e4a08",
+  fbBg:"rgba(235,226,208,0.97)",  fbBdr:"#c4b080", fbClr:"#5a4830", fbDim:"#c8bc9a",
+  think:"#8a7850",    link:"#7a6840",    newBtn:"#7a6840", info:"#9a8a60",
+  delClr:"#b83030", cardBdr:"#c4b080", cardBdrH:"#8a5e0a",
+  keyClr:"#6e4a08", itemClr:"#1a5070", toolClr:"#5a4830", dlg:"#a8460a",
+  charClr:"#7030b0", evClr:"#5a4830", actClr:"#6e4a08", bookClr:"#0a7a8a",
+};
+
+const DEFAULT_CONDITIONS = {superficial:[],moderate:[],severe:[],positive:[]};
+const DEFAULT_PLAYER = {gender:"undefined",desc:"",quest:null,keyItems:[],items:[],tools:null,characters:[],completedQuests:[],names:[],conditions:DEFAULT_CONDITIONS};
+const DEFAULT_MEMORY = {events:[],acts:[]};
+
+/* ============================== STORAGE SHIM =============================
+   The original artifact ran in an environment providing a global
+   `window.storage` key/value API. This standalone HTML file has no such
+   backend, so it is reimplemented here on top of localStorage with the
+   exact same async shape ({key,value} / null), so all the app logic above
+   it is untouched. Everything is namespaced under "woven_fate::" so it
+   won't collide with anything else on the page's origin. */
+(function(){
+  const NS = "woven_fate::";
+  function lsKey(k){ return NS + (k?1:0) + "::" + k; } // shared/private share the same origin here
+  window.storage = {
+    async get(key, shared){
+      try{
+        const raw = window.localStorage.getItem(lsKey(key));
+        if(raw===null) throw new Error("not found");
+        return {key, value:raw, shared:!!shared};
+      }catch(e){ throw e; }
+    },
+    async set(key, value, shared){
+      try{
+        window.localStorage.setItem(lsKey(key), value);
+        return {key, value, shared:!!shared};
+      }catch(e){ return null; }
+    },
+    async delete(key, shared){
+      try{
+        window.localStorage.removeItem(lsKey(key));
+        return {key, deleted:true, shared:!!shared};
+      }catch(e){ return null; }
+    },
+    async list(prefix, shared){
+      try{
+        const out=[];
+        const pfx = lsKey(prefix||"");
+        for(let i=0;i<window.localStorage.length;i++){
+          const k=window.localStorage.key(i);
+          if(k && k.indexOf(pfx)===0) out.push(k.slice(NS.length+3));
+        }
+        return {keys:out, prefix, shared:!!shared};
+      }catch(e){ return null; }
+    }
+  };
+})();
+
+/* ============================== API SERVICE & JSON PARSER ============================== */
+/* (also holds a few small general-purpose helpers used by the API layer) */
+
+function buildSystem(mood,setting,engine,playerInfo,isJudge){
+  isJudge = isJudge||false;
+  const sObj = SETTINGS.find(s=>s.key===setting);
+  const sl = sObj ? sObj.label : setting;
+  const md = MOOD_SYSTEM[mood] || "balanced";
+  const ed = ENGINE_SYSTEM[engine] || ENGINE_SYSTEM.story_driven;
+  const pBits=[];
+  if(playerInfo && playerInfo.gender && playerInfo.gender!=="undefined") pBits.push(`gender: ${playerInfo.gender}`);
+  if(playerInfo && playerInfo.desc) pBits.push(`description: ${playerInfo.desc}`);
+  const pLine = pBits.length ? `\n\nThe player character (always addressed as "you") has the following fixed traits \u2014 keep these consistent in every scene: ${pBits.join("; ")}.` : "";
+  const memLine = (playerInfo && playerInfo.memoryContext) ? `\n\nStory so far (for continuity \u2014 do not restate verbatim, just stay consistent with it):\n${playerInfo.memoryContext}` : "";
+  const itemsLine = (playerInfo && playerInfo.itemsContext) ? `\n\nThe player currently carries:\n${playerInfo.itemsContext}` : "";
+  const condLine = (playerInfo && playerInfo.conditionsContext) ? `\n\n${playerInfo.conditionsContext}` : "";
+  if(isJudge) return `You are a game master running a ${sl} setting with this plot engine: ${ed}. Analyse player actions. Respond ONLY with raw JSON \u2014 no markdown, no explanation.${pLine}${memLine}${itemsLine}${condLine}`;
+  return `You are the game master of a ${sl} setting RPG. Plot engine: ${ed}. Tone: ${md}. Write immersive prose in second person ("You\u2026"). No game-mechanics language. Never break the fourth wall.${pLine}${memLine}${itemsLine}${condLine}\n\nCRITICAL RULE: Never write any dialogue, speech, decisions, or actions performed BY the player character. Other characters may speak and act freely, and you may describe things happening TO or AROUND the player, but the player alone decides what they say or do next. Always end your response at a moment that leaves the next action open to the player \u2014 do not narrate or imply what they say, choose, or do.\n\nFormatting:\n- Wrap character/creature names in **double asterisks**\n- Wrap location/place names in *single asterisks*\n- Always use straight double quotes " " for any spoken dialogue, never single quotes\n- Never wrap dialogue in asterisks or combine it with italics \u2014 dialogue should be plain text inside its quotes\n- Do not wrap anything else`;
+}
+
+function memoryContextString(memory,books){
+  const bits=[];
+  const latestBook = books && books.length ? books[books.length-1] : null;
+  if(latestBook) bits.push(`Story so far (Book "${latestBook.title}"): ${latestBook.summary}`);
+  const acts=memory.acts.slice(-CONTEXT_ACTS_LIMIT);
+  if(acts.length) bits.push(`Since the last chapter: ${acts.map(a=>a.text).join(" ")}`);
+  let events=memory.events.slice(-CONTEXT_EVENTS_LIMIT);
+  if(events.length<2 && latestBook && latestBook.events && latestBook.events.length){
+    const bridge=latestBook.events.slice(-2);
+    events=[...bridge,...events];
+  }
+  if(events.length) bits.push(`Recent events: ${events.map(e=>e.text).join(" \u00b7 ")}`);
+  return bits.join("\n");
+}
+
+function itemsContextString(player){
+  const bits=[];
+  if(player.tools) bits.push(`Tools of the trade (${player.tools.occupation}): ${player.tools.kit}`);
+  if(player.keyItems.length) bits.push(`Key items carried: ${player.keyItems.map(i=>i.name+(i.desc?` (${i.desc})`:"")).join(", ")}`);
+  if(player.items.length) bits.push(`General items carried: ${player.items.map(i=>i.name+(i.desc?` (${i.desc})`:"")).join(", ")}`);
+  return bits.join("\n");
+}
+
+function conditionsContextString(player){
+  const c = player.conditions || {superficial:[],moderate:[],severe:[],positive:[]};
+  const bits=[];
+  const neg=[...c.moderate.map(x=>`${x.label} (moderate)`),...c.severe.map(x=>`${x.label} (severe)`)];
+  if(neg.length) bits.push(`Active negative conditions (may work against the player physically or otherwise \u2014 factor into any challenge modifier): ${neg.join(", ")}`);
+  if(c.positive.length) bits.push(`Active positive conditions (may work in the player's favor \u2014 factor into any challenge modifier): ${c.positive.map(x=>x.label).join(", ")}`);
+  return bits.length ? `The player's active conditions:\n${bits.join("\n")}` : "";
+}
+
+const SAVE_INDEX_KEY="woven_fate_save_index";
+function saveKey(id){ return `woven_fate_save:${id}`; }
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function newId(){return `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+function byteLength(str){ try{ return new Blob([str]).size; }catch(e){ return str.length; } }
+
+async function callClaude(messages,system,maxTokens){
+  const target = activeTarget();
+  if(!target){
+    openSettingsModal();
+    throw new Error("No API target selected \u2014 add or choose one via the settings icon in the header.");
+  }
+  const providerDef = PROVIDERS[target.provider] || PROVIDERS.anthropic;
+  const model = (target.model && target.model.trim()) || providerDef.defaultModel;
+  const endpoint = resolveEndpointUrl(target.url, providerDef, model);
+  const {headers, body} = providerDef.buildRequest({
+    apiKey: target.key, model, messages, system, maxTokens: maxTokens||API_CONFIG.maxTokens,
+  });
+
+  let res;
+  try{
+    res = await fetch(endpoint, {method:"POST", headers, body:JSON.stringify(body)});
+  }catch(networkErr){
+    throw new Error(`Network error \u2014 could not reach "${target.name}" (${networkErr.message})`);
+  }
+  let data;
+  try{ data = await res.json(); }
+  catch(e){ throw new Error(`Bad response from "${target.name}" (HTTP ${res.status})`); }
+
+  const errInfo = providerDef.parseError(data);
+  if(errInfo){
+    const ty = errInfo.type, m = errInfo.message;
+    if(providerDef.id==="anthropic" && (ty==="rate_limit_error"||ty==="overloaded_error"||ty==="exceeded_limit")){
+      const resetDate = extractResetTimestamp(errInfo.raw) || extractResetTimestamp(m);
+      const resetStr = resetDate ? formatResetTime(resetDate) : null;
+      throw new Error(resetStr ? `Rate limited / overloaded \u2014 limit resets around ${resetStr}` : `Rate limited / overloaded \u2014 try again shortly (${m})`);
+    }
+    if(/rate.?limit/i.test(ty) || res.status===429) throw new Error(`Rate limited / overloaded on "${target.name}" \u2014 try again shortly (${m})`);
+    if(ty==="invalid_request_error") throw new Error(`Invalid request to "${target.name}" (${m})`);
+    if(ty==="authentication_error"||ty==="permission_error"||res.status===401||res.status===403){
+      openSettingsModal();
+      throw new Error(`Auth/permission error on "${target.name}" \u2014 check its API key (${m})`);
+    }
+    throw new Error(`API error from "${target.name}" [${ty}]: ${m}`);
+  }
+  if(!res.ok){
+    throw new Error(`"${target.name}" returned HTTP ${res.status} with an unrecognized response shape`);
+  }
+  const text = providerDef.parseText(data);
+  if(typeof text!=="string" || !text) throw new Error(`Empty or unrecognized response from "${target.name}" (check the Service Type is set correctly)`);
+  return text;
+}
+/* LLMs sometimes wrap JSON in markdown code fences, or occasionally return
+   malformed JSON outright. Strip fences defensively, then fall back to a
+   safe default (and log) rather than letting a parse error crash a turn. */
+function safeHostname(url){
+  try{ return new URL(url).hostname; }catch(e){ return ""; }
+}
+function safeParseJSON(input, fallback){
+  if(fallback===undefined) fallback=null;
+  try{
+    const cleanInput = String(input).replace(/```json|```/g,"").trim();
+    return JSON.parse(cleanInput);
+  }catch(err){
+    console.error("safeParseJSON: JSON parsing failed, returning fallback state", err, input);
+    return fallback;
+  }
+}
+const parseJSON = safeParseJSON; // kept as an alias so existing call sites are unaffected
+function extractResetTimestamp(errVal){
+  let obj=errVal;
+  if(typeof obj==="string"){
+    try{ obj=JSON.parse(obj); }
+    catch(e){
+      const match=obj.match(/\{[\s\S]*\}/);
+      if(match){ try{ obj=JSON.parse(match[0]); }catch(e2){ return null; } }
+      else return null;
+    }
+  }
+  if(!obj || typeof obj!=="object") return null;
+  const candidates=[
+    obj.resetsAt,
+    obj.windows && obj.windows["5h"] && obj.windows["5h"].resets_at,
+    obj.resolved && obj.resolved.limit && obj.resolved.limit.resets_at,
+    obj.resets_at,
+  ];
+  for(const c of candidates){
+    if(c===undefined||c===null) continue;
+    const d = typeof c==="number" ? new Date(c*1000) : new Date(c);
+    if(!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+function formatResetTime(date){
+  try{ return date.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}); }
+  catch(e){ return null; }
+}
+function looksLikeDecline(text){
+  if(!text) return false;
+  const t=text.trim().toLowerCase();
+  const patterns=[
+    /^i can'?t (help|continue|write|assist|do that|create)/,
+    /^i won'?t /,
+    /^i'?m (not (able|going) to|unable to)/,
+    /^i (must|have to) decline/,
+    /^sorry,? i can'?t/,
+    /i don'?t feel comfortable/,
+    /against (my|anthropic'?s) (guidelines|policies)/,
+    /i'?m not comfortable (writing|continuing|depicting)/,
+  ];
+  return patterns.some(p=>p.test(t));
+}
+
+function escapeHtml(s){
+  if(s===undefined||s===null) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function attr(s){ return escapeHtml(s); }
+
+/* Mirrors renderText() from the original tsx: turns **bold** / *italic* /
+   "quoted" text into styled spans. Returns an HTML string (already escaped). */
+function renderTextHtml(text){
+  if(!text) return "";
+  return text.split(/\n\n+/).map((para,pi)=>{
+    const regex=/\*\*(.+?)\*\*|\*(.+?)\*|"([^"]+)"|\u201c([^\u201d]+)\u201d|(?:^|[\s(*])'((?:[^']|'(?=[a-zA-Z]))*?)'(?=[\s,.!?;:]|$)/g;
+    let last=0,match; const parts=[];
+    while((match=regex.exec(para))!==null){
+      if(match.index>last) parts.push(escapeHtml(para.slice(last,match.index)));
+      if(match[1]) parts.push(`<strong style="color:var(--nb);font-weight:600">${escapeHtml(match[1])}</strong>`);
+      else if(match[2]) parts.push(`<em style="color:var(--ni);font-style:italic">${escapeHtml(match[2])}</em>`);
+      else if(match[5]!==undefined){
+        const lead = match[0].startsWith("'") ? "" : match[0][0];
+        if(lead) parts.push(escapeHtml(lead));
+        parts.push(`<span style="color:var(--dlg);font-weight:600">'${escapeHtml(match[5])}'</span>`);
+      } else {
+        const spoken = match[3]!==undefined ? match[3] : match[4];
+        const isStraight = match[3]!==undefined;
+        const openQ = isStraight ? '"' : "\u201c";
+        const closeQ = isStraight ? '"' : "\u201d";
+        parts.push(`<span style="color:var(--dlg);font-weight:600">${openQ}${escapeHtml(spoken)}${closeQ}</span>`);
+      }
+      last=match.index+match[0].length;
+    }
+    if(last<para.length) parts.push(escapeHtml(para.slice(last)));
+    return `<p style="margin:${pi===0?"0":"10px 0 0"}">${parts.join("")}</p>`;
+  }).join("");
+}
+/* ============================== STATE STORE (S) ============================== */
+
+const S = {
+  dark: true,
+  screen: "setup", // setup | game | saves
+  apiTargets: migrateLegacyApiKeyIfNeeded().map(t => ({...t, provider: t.provider || detectProviderId(t.url) || "anthropic"})),
+  activeTargetId: getStoredActiveTargetId(),
+  settingsOpen: false,
+  settingsMode: "list", // "list" | "form"
+  editingTargetId: null, // null while adding a brand-new target
+  targetForm: {name:"", url:API_CONFIG.defaultUrl, provider:"anthropic", model:"", key:""},
+  apiKeyVisible: false,
+  mood: null,
+  setting: null,
+  engine: "story_driven",
+  player: JSON.parse(JSON.stringify(DEFAULT_PLAYER)),
+  memory: JSON.parse(JSON.stringify(DEFAULT_MEMORY)),
+  books: [],
+  bookSuggestion: false,
+  bookModal: null,
+  modalTab: "book",
+  tabsViewed: {book:true, personality:false},
+  msgs: [],
+  input: "",
+  history: [],
+  status: "idle", // idle | narrating | saving | loading_save | awaiting_choice | booking
+  challengeData: null,
+  saveTracking: {activeSaveId:null,turnsAtSave:0,result:null,message:null},
+  saveList: [],
+  savesLoading: false,
+  renamingId: null,
+  renameText: "",
+  panelOpen: false,
+  statusOpen: false,
+  journalOpen: false,
+  booksOpen: false,
+  activeBookTab: 0,
+  suggestions: null,
+  suggOpen: false,
+  suggBusy: false,
+  importStatus: null,
+  mergeMode: false,
+  mergeSelection: [],
+  autosaveEnabled: true,
+  lastSaveTurnCount: 0,
+  autosaveMeta: null,
+};
+let autosaveInFlight = false;
+function busy(){ return S.status !== "idle"; }
+function theme(){ return S.dark ? D : L; }
+
+/* ---- API target CRUD ---- */
+function activeTarget(){
+  return S.apiTargets.find(t=>t.id===S.activeTargetId) || null;
+}
+function targetSummary(t){
+  const host = safeHostname(t.url) || t.url;
+  const providerDef = PROVIDERS[t.provider] || PROVIDERS.anthropic;
+  const modelBit = (t.model && t.model.trim()) || providerDef.defaultModel || "default model";
+  return `${providerDef.label.replace(/\s*\(.*$/,"")} \u00b7 ${host} \u00b7 ${modelBit}${t.key ? "" : " \u00b7 no key"}`;
+}
+function addOrUpdateTarget(id, name, url, provider, model, key){
+  const trimmedName = (name||"").trim() || safeHostname(url) || "Untitled target";
+  const trimmedUrl = (url||"").trim();
+  const trimmedProvider = PROVIDERS[provider] ? provider : "anthropic";
+  const trimmedModel = (model||"").trim();
+  const trimmedKey = (key||"").trim();
+  if(id){
+    S.apiTargets = S.apiTargets.map(t => t.id===id ? {...t, name:trimmedName, url:trimmedUrl, provider:trimmedProvider, model:trimmedModel, key:trimmedKey} : t);
+    return id;
+  }
+  const newTarget = {id:newId(), name:trimmedName, url:trimmedUrl, provider:trimmedProvider, model:trimmedModel, key:trimmedKey};
+  S.apiTargets = [...S.apiTargets, newTarget];
+  return newTarget.id;
+}
+function deleteTarget(id){
+  S.apiTargets = S.apiTargets.filter(t=>t.id!==id);
+  if(S.activeTargetId===id){
+    S.activeTargetId = S.apiTargets.length ? S.apiTargets[0].id : null;
+    setStoredActiveTargetId(S.activeTargetId||"");
+  }
+  setStoredApiTargets(S.apiTargets);
+}
+function selectTarget(id){
+  S.activeTargetId = id;
+  setStoredActiveTargetId(id);
+}
+
+function applyThemeVars(){
+  const t = theme();
+  const root = document.documentElement;
+  for(const k in t) root.style.setProperty("--"+k, t[k]);
+}
+
+/* ---- Pure state mutation helper ----
+   Every place in the app that changes S goes through here rather than
+   mutating it inline and separately remembering to re-render: the updater
+   makes the change, the change is opportunistically persisted, and the UI
+   is refreshed. `updateFn` lets a call site choose a cheap, targeted UI
+   refresh (e.g. just the input bar) instead of paying for a full render. */
+function setState(updater, updateFn){
+  updater(S);
+  persistSession();
+  (updateFn || render)();
+}
+
+const SESSION_STORAGE_KEY = "woven_fate_session_v1";
+function persistSession(){
+  try{
+    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+      dark:S.dark, mood:S.mood, setting:S.setting, engine:S.engine,
+      player:S.player, memory:S.memory, books:S.books, msgs:S.msgs,
+      history:S.history, screen:S.screen, autosaveEnabled:S.autosaveEnabled,
+      savedAt:Date.now(),
+    }));
+  }catch(e){ /* storage full/unavailable \u2014 non-fatal, Tales saves are the durable store */ }
+}
+
+/* ============================== GAME ENGINE LOGIC ============================== */
+
+async function getSaveIndex(){
+  try{
+    const idxRes = await window.storage.get(SAVE_INDEX_KEY);
+    return idxRes && idxRes.value ? JSON.parse(idxRes.value) : [];
+  }catch(e){ return []; }
+}
+async function setSaveIndex(ids){
+  try{ await window.storage.set(SAVE_INDEX_KEY, JSON.stringify(ids)); }catch(e){}
+}
+
+async function refreshSaveList(){
+  S.savesLoading = true;
+  render();
+  const ids = await getSaveIndex();
+  const metas = [];
+  for(const id of ids){
+    try{
+      const r = await window.storage.get(saveKey(id));
+      if(r && r.value){
+        const d = JSON.parse(r.value);
+        metas.push({id,name:d.name,mood:d.mood,setting:d.setting,engine:d.engine,gender:d.gender,desc:d.desc,savedAt:d.savedAt});
+      }
+    }catch(e){}
+  }
+  metas.sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));
+  S.saveList = metas;
+  S.savesLoading = false;
+  render();
+}
+
+function labelFor(list,key){ const f=list.find(x=>x.key===key); return f ? f.label : key; }
+
+function handleDropItem(kind,name){
+  setState(s=>{ s.player[kind] = s.player[kind].filter(i=>i.name!==name); }, updateInventoryUI);
+}
+
+function toggleMergeSelect(actualIdx){
+  setState(s=>{
+    const sel = s.mergeSelection;
+    if(sel.includes(actualIdx)){ s.mergeSelection = sel.filter(x=>x!==actualIdx); }
+    else if(sel.length>=2){ /* no-op, selection full */ }
+    else { s.mergeSelection = [...sel, actualIdx]; }
+  }, updateJournalUI);
+}
+
+function handleMergeCharacters(){
+  if(S.mergeSelection.length!==2) return;
+  setState(s=>{
+    const chars = [...s.player.characters];
+    const sorted = [...s.mergeSelection].sort((a,b)=>a-b);
+    const i1=sorted[0], i2=sorted[1];
+    const a=chars[i1], b=chars[i2];
+    const aNames = a.names || [a.name].filter(Boolean);
+    const bNames = b.names || [b.name].filter(Boolean);
+    const namesArr = [...new Set([...aNames,...bNames])];
+    const role = (a.role && b.role && a.role!==b.role) ? `${a.role} / ${b.role}` : (a.role||b.role||"");
+    const note = b.note || a.note || "";
+    const status = b.status || a.status || "unknown";
+    const present = !!(a.present || b.present);
+    const merged = {names:namesArr, role, note, status, present};
+    const newChars = chars.filter((_,idx)=>idx!==i1 && idx!==i2);
+    newChars.push(merged);
+    s.player.characters = newChars;
+    s.mergeSelection = [];
+    s.mergeMode = false;
+  }, updateJournalUI);
+}
+
+function playerInfo(){
+  return {
+    gender: S.player.gender,
+    desc: S.player.desc.trim(),
+    memoryContext: memoryContextString(S.memory, S.books),
+    itemsContext: itemsContextString(S.player),
+    conditionsContext: conditionsContextString(S.player),
+  };
+}
+
+function handleRandom(){
+  setState(s=>{
+    s.mood = pick(MOODS).key;
+    s.setting = pick(SETTINGS).key;
+    s.engine = pick(ENGINES).key;
+    s.player.gender = "undefined";
+    s.player.desc = "";
+  });
+}
+
+async function deriveTools(genderV,descV,settingV,engineV){
+  const sObj = SETTINGS.find(x=>x.key===settingV);
+  const sl = sObj ? sObj.label : settingV;
+  const eObj = ENGINES.find(x=>x.key===engineV);
+  const el = eObj ? eObj.label : engineV;
+  try{
+    const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer a plausible occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then list 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin). Return ONLY raw JSON: {"occupation":"...","kit":"..."}`}],"Respond ONLY with raw JSON, no markdown.",200);
+    const parsed = parseJSON(raw,null);
+    if(!parsed || typeof parsed.occupation!=="string" || !parsed.occupation.trim() || typeof parsed.kit!=="string" || !parsed.kit.trim()){
+      return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
+    }
+    return parsed;
+  }catch(e){
+    return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
+  }
+}
+
+async function deriveCharacterNames(descV){
+  if(!descV || !descV.trim()) return [];
+  try{
+    const raw = await callClaude([{role:"user",content:`Character description: "${descV.trim()}"\n\nExtract any name(s) explicitly given for this character \u2014 civilian name, hero/code name, alias, callsign, etc. Only include names actually stated in the text; do not invent one. Return ONLY raw JSON: {"names":["Name1","Name2"]} (empty array if no name is given).`}],"Respond ONLY with raw JSON, no markdown.",150);
+    const parsed = parseJSON(raw,null);
+    if(parsed && Array.isArray(parsed.names)) return parsed.names.filter(n=>typeof n==="string"&&n.trim()).slice(0,3);
+  }catch(e){}
+  return [];
+}
+
+/* ── Extraction: quest, inventory, characters, conditions \u2014 runs every turn ── */
+async function extractState(narrativeText,pInfo,curQuest,curKey,curItems,curChars,curTools,curConditions){
+  try{
+    const toolsLine = curTools ? `Tools of the Trade kit (fixed baseline gear \u2014 NEVER log these or close variants of them as itemsGained, they are not new pickups): ${curTools.kit}` : "Tools of the Trade kit: none set";
+    const knownCharsLine = curChars.map(c=>{
+      const namesArr = (c.names||[c.name]).filter(Boolean);
+      const primary = namesArr[0]||"Unknown";
+      const aliasTag = namesArr.length>1 ? ` [also known as: ${namesArr.slice(1).join(", ")}]` : "";
+      const roleTag = c.role ? `role: ${c.role}` : "role: unknown";
+      const noteTag = c.note ? `; ${c.note}` : "";
+      return `${primary}${aliasTag} (${roleTag}${noteTag})`;
+    }).join("; ")||"none";
+    const cond = curConditions || DEFAULT_CONDITIONS;
+    const condLine = `Current conditions \u2014 superficial: ${cond.superficial.map(c=>c.label).join(", ")||"none"}; moderate: ${cond.moderate.map(c=>c.label).join(", ")||"none"}; severe: ${cond.severe.map(c=>c.label).join(", ")||"none"}; positive: ${cond.positive.map(c=>c.label).join(", ")||"none"}`;
+    const prompt=`Recent narration:\n"""${narrativeText}"""\n\nCurrent quest: ${curQuest?`${curQuest.title} \u2014 ${curQuest.desc}`:"none"}\n${toolsLine}\nCurrent key items: ${curKey.map(i=>i.name).join(", ")||"none"}\nCurrent general items: ${curItems.map(i=>i.name).join(", ")||"none"}\nKnown characters (with what's known about them so far): ${knownCharsLine}\n${condLine}\n\nAnalyse ONLY what this narration establishes. Return ONLY raw JSON:\n{\n "questUpdate": {"action":"set"|"update"|"complete"|"none","title":"...","desc":"..."},\n "itemsGained": [{"name":"...","desc":"...","key":boolean}],\n "itemsLost": ["exact name", ...],\n "characterUpdates": [{"name":"...","present":true|false,"status":"ally|hostile|neutral|unknown|romantic|deceased|other or null","note":"short one-line description/relationship, or null","role":"short stable descriptor of their occupation/role/abilities, or null","alsoKnownAs":"an ADDITIONAL name/alias for this character being genuinely revealed or established this turn (e.g. a hero's civilian identity, or vice versa) \u2014 both names remain valid and may both be used going forward; or null","replaces":"exact prior name from the Known characters list above, ONLY if this character was previously tracked under a different name or generic placeholder (e.g. 'Rescued Hostage') and has now been properly identified as the same individual \u2014 else null"}],\n "conditionsGained": [{"tier":"superficial"|"moderate"|"severe"|"positive","label":"short name","desc":"short description"}],\n "conditionsResolved": ["exact label", ...],\n "sceneEnded": true|false\n}\nRules: For questUpdate \u2014 use "set" ONLY when there was no active quest and a brand-new one is being established. Use "update" when the ALREADY-active quest's specifics, title, or immediate objective are being refined/progressed but it is fundamentally the same overarching goal \u2014 do NOT use "set" for this, that incorrectly signals a brand new quest to the player. Use "complete" when the active quest has just been fully resolved. Use "none" if nothing quest-related changed. Don't invent goals from flavor text alone. Only list itemsGained if something tangible was NEWLY acquired this turn \u2014 never for gear that is part of the Tools of the Trade kit above (that kit is always already carried, mentioning it again is not a new pickup). Only list itemsLost if something was clearly consumed, destroyed, given away, lost, or stolen. key=true only for plot-critical, irreplaceable items.\nFor characterUpdates: include a named, significant character (not background extras) whenever they are present in this scene OR clearly just left/exited it. Only reference characters from the Known characters list, or genuinely new characters actually appearing in THIS narration \u2014 never reuse a name from the Known characters list for an unrelated new character just because it happens to be listed as "known". Set "present" to true if they are in the scene right now, false if they just departed. ONLY set "status" and "note" if something about the character's relationship, disposition, or situation actually changed this turn \u2014 otherwise leave them as null so their prior relationship/description is preserved untouched. NEVER use status or note to describe mere absence (e.g. never write "not present" as a status or note) \u2014 absence is communicated only via "present":false. Use "replaces" to merge a newly-identified character with their prior placeholder entry instead of creating a duplicate. Use "role" to record a STABLE descriptor of who/what this character fundamentally is \u2014 their occupation, position, or abilities (e.g. "Academy student", "History teacher", "City Watch detective") \u2014 and ONLY set it the first time this is established, or if it is later revealed to be genuinely different than previously understood; leave it null on every other turn so it is never overwritten by a description of their current action or last appearance. Do not conflate "role" with "note" \u2014 "note" is for relationship/situation/what just happened, "role" is for their enduring identity. If a known character's role is listed as "unknown" above and this narration provides or clearly implies information that would establish it \u2014 even if this isn't their first appearance \u2014 set "role" now to fill that gap. Use "alsoKnownAs" when a character is revealed to have a second, ongoing identity that will continue to be used alongside their current name (e.g. a hero's secret identity) \u2014 both names stay valid and remain displayed together; this is NOT the same as "replaces", which is only for fully retiring a placeholder label (like "Rescued Hostage") that was never really a name in the first place. When referencing an existing character via "name" or "replaces", use exactly ONE of their individual known names \u2014 never a combined form, and never text like "[also known as: ...]" (that bracketed text is display formatting only, never a real name to echo back).\nFor conditions: only add a new condition if this narration clearly shows the player being hurt, weakened, poisoned, cursed, exhausted, or similarly afflicted (negative), or meaningfully buffed/inspired/emboldened (positive) \u2014 never for flavor text alone. Tier guidance for negative conditions: "superficial" = minor and self-resolving with time (bruises, minor scrapes, being winded); "moderate" = notable but treatable with a deliberate action (a real wound, poisoning, being shaken); "severe" = serious, requiring both treatment and time (a broken bone, a deep wound, a serious curse). Positive conditions are understood to last only for the current scene. List a condition in "conditionsResolved" (by its EXACT current label) ONLY when this narration clearly shows the player actively treating, healing, or otherwise resolving it \u2014 not merely time passing. Set "sceneEnded" to true only when a distinct scene/encounter/conversation has just concluded (a chase or fight that moves through several locations still counts as ONE scene; a new conversation, even in the same location as the last, counts as a NEW scene). Do not invent conditions unsupported by the narration.`;
+    const raw = await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",500);
+    const parsed = parseJSON(raw,{questUpdate:{action:"none"},itemsGained:[],itemsLost:[],characterUpdates:[],conditionsGained:[],conditionsResolved:[],sceneEnded:false});
+
+    if(parsed.questUpdate && (parsed.questUpdate.action==="set" || parsed.questUpdate.action==="update")){
+      const p = S.player;
+      p.quest = {title:parsed.questUpdate.title, desc:parsed.questUpdate.desc, startedBookId: p.quest ? p.quest.startedBookId : undefined};
+    } else if(parsed.questUpdate && parsed.questUpdate.action==="complete"){
+      S.player.quest = null;
+    }
+    if(Array.isArray(parsed.itemsLost) && parsed.itemsLost.length){
+      S.player.keyItems = S.player.keyItems.filter(i=>!parsed.itemsLost.includes(i.name));
+      S.player.items = S.player.items.filter(i=>!parsed.itemsLost.includes(i.name));
+    }
+    let rejected = {key:[],general:[]};
+    if(Array.isArray(parsed.itemsGained) && parsed.itemsGained.length){
+      const lostNames = parsed.itemsLost||[];
+      const curKeyAfterLoss = curKey.filter(i=>!lostNames.includes(i.name));
+      const curItemsAfterLoss = curItems.filter(i=>!lostNames.includes(i.name));
+      let newKey=[...curKeyAfterLoss];
+      let newItems=[...curItemsAfterLoss];
+      for(const ng of parsed.itemsGained){
+        if(!ng.name)continue;
+        if(ng.key){
+          if(newKey.find(i=>i.name===ng.name))continue;
+          if(newKey.length>=MAX_KEY){ rejected.key.push(ng.name); continue; }
+          newKey.push({name:ng.name,desc:ng.desc});
+        } else {
+          if(newItems.find(i=>i.name===ng.name))continue;
+          if(newItems.length>=MAX_ITEMS){ rejected.general.push(ng.name); continue; }
+          newItems.push({name:ng.name,desc:ng.desc});
+        }
+      }
+      S.player.keyItems = newKey;
+      S.player.items = newItems;
+    }
+    parsed.rejected = rejected;
+    if(Array.isArray(parsed.characterUpdates) && parsed.characterUpdates.length){
+      let chars=[...S.player.characters];
+      for(let cu of parsed.characterUpdates){
+        if(!cu.name)continue;
+        if(cu.name.includes(" / ")) cu={...cu,name:cu.name.split(" / ")[0].trim()};
+        if(cu.alsoKnownAs && cu.alsoKnownAs.includes(" / ")) cu={...cu,alsoKnownAs:null};
+        const idx=chars.findIndex(c=>(c.names||[c.name]).includes(cu.name) || (cu.replaces && (c.names||[c.name]).includes(cu.replaces)));
+        const prior = idx>=0 ? chars[idx] : null;
+        if(idx>=0) chars.splice(idx,1);
+
+        let namesArr;
+        if(cu.replaces && prior){
+          namesArr=[cu.name];
+        } else {
+          namesArr = prior ? [...(prior.names||[prior.name]).filter(Boolean)] : [];
+          if(!namesArr.includes(cu.name)) namesArr.push(cu.name);
+        }
+        if(cu.alsoKnownAs && !namesArr.includes(cu.alsoKnownAs)) namesArr.push(cu.alsoKnownAs);
+
+        const entry={
+          names:namesArr,
+          status:cu.status || (prior && prior.status) || "unknown",
+          note:cu.note || (prior && prior.note) || "",
+          role:cu.role || (prior && prior.role) || "",
+          present: cu.present!==undefined ? !!cu.present : true,
+        };
+        chars.push(entry);
+      }
+      if(chars.length>MAX_CHARS){
+        const questText = curQuest ? `${curQuest.title} ${curQuest.desc}` : "";
+        const isProtected = (namesArr) => namesArr.some(n=>narrativeText.includes(n)||questText.includes(n));
+        let i=0;
+        while(chars.length>MAX_CHARS && i<chars.length){
+          if(!isProtected(chars[i].names||[chars[i].name])){ chars.splice(i,1); }
+          else { i++; }
+        }
+      }
+      S.player.characters = chars;
+    }
+
+    let condResult = {
+      superficial:[...cond.superficial],
+      moderate:[...cond.moderate],
+      severe:[...cond.severe],
+      positive:[...cond.positive],
+    };
+    if(Array.isArray(parsed.conditionsResolved)){
+      for(const label of parsed.conditionsResolved){
+        const midx=condResult.moderate.findIndex(c=>c.label===label);
+        if(midx>=0){ condResult.moderate.splice(midx,1); continue; }
+        const sidx=condResult.severe.findIndex(c=>c.label===label);
+        if(sidx>=0 && !condResult.severe[sidx].treatmentStarted){
+          condResult.severe[sidx]={...condResult.severe[sidx],treatmentStarted:true,turnsLeft:3};
+        }
+      }
+    }
+    if(parsed.sceneEnded){ condResult.positive=[]; }
+    let questFailedByConditions=false;
+    let rejectedConditions=[];
+    if(Array.isArray(parsed.conditionsGained)){
+      for(const cg of parsed.conditionsGained){
+        if(!cg.label)continue;
+        if(cg.tier==="positive"){
+          if(condResult.positive.length<MAX_COND) condResult.positive.push({label:cg.label,desc:cg.desc||""});
+          continue;
+        }
+        let currentTier = ["superficial","moderate","severe"].includes(cg.tier) ? cg.tier : "superficial";
+        let desc=cg.desc||"";
+        let placed=false;
+        while(!placed){
+          if(currentTier==="superficial"){
+            if(condResult.superficial.length<MAX_COND){ condResult.superficial.push({label:cg.label,desc,turnsLeft:3}); placed=true; }
+            else { currentTier="moderate"; desc = desc ? `${desc} \u2014 worse than it looks.` : "Worse than it looks."; }
+          } else if(currentTier==="moderate"){
+            if(condResult.moderate.length<MAX_COND){ condResult.moderate.push({label:cg.label,desc}); placed=true; }
+            else { currentTier="severe"; desc = desc ? `${desc} \u2014 worse than it looks.` : "Worse than it looks."; }
+          } else {
+            if(condResult.severe.length<MAX_COND){ condResult.severe.push({label:cg.label,desc,treatmentStarted:false,turnsLeft:null}); placed=true; }
+            else {
+              if(curQuest) questFailedByConditions=true;
+              rejectedConditions.push(cg.label);
+              placed=true;
+            }
+          }
+        }
+      }
+    }
+    condResult.superficial = condResult.superficial.map(c=>({...c,turnsLeft:c.turnsLeft-1})).filter(c=>c.turnsLeft>0);
+    condResult.severe = condResult.severe.map(c=> c.treatmentStarted ? {...c,turnsLeft:c.turnsLeft-1} : c).filter(c=> !c.treatmentStarted || c.turnsLeft>0);
+    S.player.conditions = condResult;
+    parsed.questFailedByConditions=questFailedByConditions;
+    parsed.rejectedConditions=rejectedConditions;
+
+    return parsed;
+  }catch(e){return null;}
+}
+
+/* ── Journal event helpers ── */
+async function collapseEventsIfNeeded(events,acts){
+  if(events.length<=EVENTS_LIMIT) return {events,acts};
+  const toCollapse=events.slice(0,EVENTS_COLLAPSE);
+  const rest=events.slice(EVENTS_COLLAPSE);
+  try{
+    const raw2=await callClaude([{role:"user",content:`Condense the following journal events into a single short paragraph (3-4 sentences) summarizing this stretch of the story as a chapter/act overview:\n\n${toCollapse.map(e=>"- "+e.text).join("\n")}\n\nReturn ONLY raw JSON: {"act":"..."}`}],"Respond ONLY with raw JSON, no markdown.",400);
+    const parsed2=parseJSON(raw2,null);
+    return {events:rest,acts:[...acts,{text:(parsed2&&parsed2.act)?parsed2.act:toCollapse.map(e=>e.text).join(" ")}]};
+  }catch(e){
+    return {events:[...toCollapse,...rest],acts};
+  }
+}
+
+async function appendJournalEvents(newTexts){
+  if(!newTexts || !newTexts.length) return;
+  const merged=[...S.memory.events,...newTexts.map(e=>({text:e}))];
+  const {events,acts}=await collapseEventsIfNeeded(merged,S.memory.acts);
+  S.memory = {events,acts};
+}
+
+async function tagQuestFromExtraction(text,pInfo,freshState){
+  const fs=freshState||{};
+  const qCur = fs.quest!==undefined?fs.quest:S.player.quest;
+  const kCur = fs.keyItems!==undefined?fs.keyItems:S.player.keyItems;
+  const iCur = fs.items!==undefined?fs.items:S.player.items;
+  const cCur = fs.characters!==undefined?fs.characters:S.player.characters;
+  const tCur = fs.tools!==undefined?fs.tools:S.player.tools;
+  const ndCur = fs.conditions!==undefined?fs.conditions:S.player.conditions;
+  const qu=await extractState(text,pInfo,qCur,kCur,iCur,cCur,tCur,ndCur);
+  const qAction = qu && qu.questUpdate ? qu.questUpdate.action : undefined;
+  if(qAction==="set"){
+    const startedBookId = S.books.length ? S.books[S.books.length-1].id : null;
+    if(S.player.quest) S.player.quest = {...S.player.quest, startedBookId};
+  }
+  if(qAction==="complete"){
+    const completedTitle=(qCur&&qCur.title)||qu.questUpdate.title||"";
+    const completedDesc=(qCur&&qCur.desc)||qu.questUpdate.desc||"";
+    const startedBookId=(qCur&&qCur.startedBookId)!==undefined?qCur.startedBookId:null;
+    S.player.completedQuests=[...(S.player.completedQuests||[]),{title:completedTitle,desc:completedDesc,startedBookId,completedBookId:null,outcome:"completed"}];
+    await appendJournalEvents([`Completed the quest "${completedTitle}"${completedDesc?`: ${completedDesc}`:""}`]);
+    if(S.memory.acts.length>=BOOK_SUGGEST_ACTS || S.memory.events.length>=BOOK_SUGGEST_EVENTS){
+      S.bookSuggestion = true;
+    }
+  }
+  if(qu && qu.questFailedByConditions && qCur){
+    const failedTitle=qCur.title||"";
+    const failedDesc=qCur.desc||"";
+    const startedBookId=qCur.startedBookId!==undefined?qCur.startedBookId:null;
+    S.player.quest=null;
+    S.player.completedQuests=[...(S.player.completedQuests||[]),{title:failedTitle,desc:failedDesc,startedBookId,completedBookId:null,outcome:"failed"}];
+    await appendJournalEvents([`Failed the quest "${failedTitle}"${failedDesc?`: ${failedDesc}`:""} \u2014 worn down by accumulated injury.`]);
+  }
+  if(qu && (qAction==="set"||qAction==="update"||qAction==="complete"||(qu.questFailedByConditions&&qCur)||(qu.rejected&&qu.rejected.key&&qu.rejected.key.length)||(qu.rejected&&qu.rejected.general&&qu.rejected.general.length)||(qu.rejectedConditions&&qu.rejectedConditions.length))){
+    const a=[...S.msgs];
+    const last={...a[a.length-1]};
+    if(qAction==="set"||qAction==="update"||qAction==="complete"){
+      last.questTag={
+        action:qAction,
+        title: qAction==="complete" ? ((qCur&&qCur.title)||qu.questUpdate.title) : qu.questUpdate.title
+      };
+    }
+    if(qu.questFailedByConditions && qCur){
+      last.questTag={action:"fail",title:qCur.title||""};
+    }
+    if((qu.rejected&&qu.rejected.key&&qu.rejected.key.length)||(qu.rejected&&qu.rejected.general&&qu.rejected.general.length)){
+      last.inventoryFullTag={key:(qu.rejected&&qu.rejected.key)||[],general:(qu.rejected&&qu.rejected.general)||[]};
+    }
+    if(qu.rejectedConditions && qu.rejectedConditions.length){
+      last.conditionsFullTag=qu.rejectedConditions;
+    }
+    a[a.length-1]=last;
+    S.msgs=a;
+  }
+  return qu;
+}
+
+async function compactHistory(newHistory){
+  if(newHistory.length<=HISTORY_LIMIT){ S.history=newHistory; return; }
+  const toCompact=newHistory.slice(0,newHistory.length-HISTORY_KEEP);
+  const keep=newHistory.slice(newHistory.length-HISTORY_KEEP);
+  try{
+    const recentLine = S.memory.events.length ? `\n\nAlready logged (do not restate these \u2014 only capture what's genuinely new in the turns below):\n${S.memory.events.slice(-5).map(e=>"- "+e.text).join("\n")}` : "";
+    const raw=await callClaude([{role:"user",content:`Summarize the following story turns into 1-2 concise journal-style event entries (each one sentence, past tense, focused on what changed or mattered \u2014 character developments, discoveries, decisions, consequences).${recentLine}\n\nTurns:\n\n${toCompact.map(e=>`${e.role==="user"?"Player":"Story"}: ${e.content}`).join("\n")}\n\nReturn ONLY raw JSON: {"events":["...","..."]}`}],"Respond ONLY with raw JSON, no markdown.",300);
+    const parsed=parseJSON(raw,null);
+    if(!parsed || !Array.isArray(parsed.events) || !parsed.events.length){
+      S.history=newHistory;
+      return;
+    }
+    const merged=[...S.memory.events,...parsed.events.map(e=>({text:e}))];
+    const {events,acts}=await collapseEventsIfNeeded(merged,S.memory.acts);
+    S.memory={events,acts};
+    S.history=keep;
+  }catch(e){
+    S.history=newHistory;
+  }
+}
+
+async function refreshAutosaveMeta(){
+  try{
+    const r=await window.storage.get(saveKey(AUTOSAVE_ID));
+    if(r && r.value){ const d=JSON.parse(r.value); S.autosaveMeta={name:d.name,mood:d.mood,setting:d.setting,engine:d.engine,savedAt:d.savedAt}; }
+    else S.autosaveMeta=null;
+  }catch(e){ S.autosaveMeta=null; }
+}
+
+function handleToggleAutosave(){
+  setState(s=>{
+    s.autosaveEnabled = !s.autosaveEnabled;
+    window.storage.set("autosave_pref", s.autosaveEnabled?"on":"off").catch(()=>{});
+  });
+}
+
+async function performAutosave(narratorCountAtCall){
+  try{
+    const engineLabel = S.engine!=="story_driven" ? ` ${labelFor(ENGINES,S.engine)}` : "";
+    const namesSuffix = (S.player.names && S.player.names.length) ? ` \u2014 ${S.player.names.join(" / ")}` : "";
+    const name = `Autosave \u2014 ${labelFor(MOODS,S.mood)} ${labelFor(SETTINGS,S.setting)}${engineLabel}${namesSuffix}`;
+    const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
+      gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,
+      savedAt:Date.now(),isAutosave:true};
+    const payloadStr=JSON.stringify(payload);
+    if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
+      throw new Error("Autosave failed \u2014 this tale is too large to save (near the per-save storage limit). Manual saves will likely fail too \u2014 export your progress and free up space.");
+    }
+    const res=await window.storage.set(saveKey(AUTOSAVE_ID),payloadStr);
+    if(!res) throw new Error("Autosave failed \u2014 storage write did not complete. You may be at your total storage limit; manual saves will likely fail too.");
+    S.autosaveMeta={name,mood:S.mood,setting:S.setting,engine:S.engine,savedAt:payload.savedAt};
+    S.lastSaveTurnCount=narratorCountAtCall;
+    S.saveTracking={...S.saveTracking,result:"autosaved",message:null};
+    render();
+    setTimeout(()=>{ S.saveTracking={...S.saveTracking,result:null,message:null}; render(); },2200);
+  }catch(err){
+    S.saveTracking={...S.saveTracking,result:"error",message:err.message||"Autosave failed."};
+    render();
+    setTimeout(()=>{ S.saveTracking={...S.saveTracking,result:null,message:null}; render(); },5000);
+  }
+}
+
+function maybeAutosave(){
+  if(!S.autosaveEnabled || busy() || autosaveInFlight) return;
+  const narratorCount = S.msgs.filter(m=>m.type==="narrator").length;
+  if(narratorCount - S.lastSaveTurnCount >= AUTOSAVE_INTERVAL){
+    autosaveInFlight=true;
+    performAutosave(narratorCount).finally(()=>{ autosaveInFlight=false; });
+  }
+}
+
+async function commitNarrative(text,userContent,extraFields){
+  extraFields = extraFields || {};
+  S.msgs=[...S.msgs,{type:"narrator",text,...extraFields}];
+  appendMessage(S.msgs[S.msgs.length-1]); // targeted DOM update: append, don't rebuild the log
+  const newHistory = userContent===null ? [...S.history,{role:"assistant",content:text}] : [...S.history,{role:"user",content:userContent},{role:"assistant",content:text}];
+  await compactHistory(newHistory);
+  await tagQuestFromExtraction(text,playerInfo());
+  refreshLastMessageNode(); // tagQuestFromExtraction may have annotated the message just appended
+}
+
+async function runStep(coreFn,retryKind,retryPayload,replaceIdx){
+  if(replaceIdx!==undefined){
+    S.msgs = S.msgs.filter((_,i)=>i!==replaceIdx);
+    removeMessageNode(replaceIdx);
+  }
+  S.status="narrating";
+  render();
+  try{
+    const nextStatus=await coreFn();
+    S.status=nextStatus||"idle";
+  }catch(err){
+    S.msgs=[...S.msgs,{type:"error",text:err.message||"Error",retry:{kind:retryKind,payload:retryPayload}}];
+    S.status="idle";
+    appendMessage(S.msgs[S.msgs.length-1]);
+  }
+  render();
+  persistSession();
+  scrollBottom();
+  maybeAutosave();
+  const inputEl=document.getElementById("mainInput");
+  if(inputEl) inputEl.focus();
+}
+
+async function narratorTurnCore(action){
+  const pInfo=playerInfo();
+  const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and active conditions (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the player's active moderate/severe negative conditions (working against them) and positive conditions (working in their favor), using this same single modifier tier. Never let superficial conditions influence this. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true));
+  const parsed=parseJSON(raw,null);
+  if(!parsed || typeof parsed!=="object" || !parsed.resolution){
+    if(looksLikeDecline(raw)){
+      throw new Error("The story engine declined to continue this scene as described. Try rephrasing your action.");
+    }
+    throw new Error("The story engine's response couldn't be understood (malformed reply)");
+  }
+
+  if(parsed.resolution==="item_resolution"){
+    if(parsed.itemExpended){
+      S.player.items = S.player.items.filter(i=>i.name!==parsed.itemExpended);
+    }
+    await commitNarrative(parsed.narrative||"...",action);
+  } else if(parsed.resolution==="challenge"){
+    const modifier = (parsed.modifier==="favorable"||parsed.modifier==="unfavorable") ? parsed.modifier : "neutral";
+    const buttons = modifier==="favorable" ? shuffle(["success","fate","fate"])
+                   : modifier==="unfavorable" ? shuffle(["failure","fate","fate"])
+                   : shuffle(["success","failure","fate"]);
+    S.challengeData={buttons,pending:action,revealed:null,modifier,reason:parsed.reason||null};
+    S.history=[...S.history,{role:"user",content:action}];
+    return "awaiting_choice";
+  } else {
+    await commitNarrative(parsed.narrative||"...",action);
+  }
+}
+
+async function outcomeTurnCore(pendingV,outcome,meta){
+  const pInfo=playerInfo();
+  const narrative=await callClaude([...S.history,{role:"user",content:`Player attempted: "${pendingV}". Outcome: ${outcome} \u2014 ${meta.desc}.\n${outcome==="success"?"Narrate triumph.":outcome==="failure"?"Narrate setback.":outcome==="mitigated_success"?"Success with complication.":"Failure with silver lining."} 2\u20133 paras, second person. Bold names, italicise places. End the scene open \u2014 do not write what the player says or does next.`}],buildSystem(S.mood,S.setting,S.engine,pInfo));
+  await commitNarrative(narrative,pendingV,{outcomeMeta:meta});
+}
+
+async function continueTurnCore(){
+  const pInfo=playerInfo();
+  const instruction="The player continues with what they're currently doing, letting events progress naturally to the next meaningful moment.";
+  const narrative=await callClaude([...S.history,{role:"user",content:`${instruction} 2\u20133 paragraphs, second person. Bold names, italicise places. End the scene open \u2014 do not write what the player says or does next.`}],buildSystem(S.mood,S.setting,S.engine,pInfo));
+  await commitNarrative(narrative,"(continues)");
+}
+
+/* ── Action suggestions ── */
+async function generateSuggestions(){
+  S.suggBusy=true;
+  render();
+  try{
+    const pInfo=playerInfo();
+    const raw=await callClaude([...S.history,{role:"user",content:`The player isn't sure what to do next. Suggest exactly 3 distinct, short, concrete things they could do or say right now, fitting the current scene, tone, and their character. Each should be phrased as something the player could type directly as their action (e.g. "Ask her about the brooch." or "Draw your revolver and demand answers."). Vary them \u2014 at least one action-oriented, one dialogue-oriented if a scene partner is present. Keep each under 14 words. Return ONLY raw JSON: {"suggestions":["...","...","..."]}`}],buildSystem(S.mood,S.setting,S.engine,pInfo),350);
+    const parsed=parseJSON(raw,null);
+    if(parsed && Array.isArray(parsed.suggestions) && parsed.suggestions.length>=3){
+      S.suggestions=parsed.suggestions.slice(0,3);
+    } else {
+      S.suggestions=null;
+    }
+  }catch(e){
+    S.suggestions=null;
+  }
+  S.suggBusy=false;
+  render();
+}
+
+function handleSuggestClick(){
+  if(busy()||S.suggBusy)return;
+  S.suggOpen=true;
+  render();
+  if(!S.suggestions) generateSuggestions();
+}
+function handleReroll(){
+  if(busy()||S.suggBusy)return;
+  generateSuggestions();
+}
+function handlePickSuggestion(text){
+  setState(s=>{ s.input=text; s.suggOpen=false; }, ()=>{
+    updateSuggBox();
+    const el=document.getElementById("mainInput");
+    if(el) el.value=text; // reflect into the textarea directly, no full rebuild
+    updateInputState();
+  });
+  setTimeout(()=>{ const el=document.getElementById("mainInput"); if(el){ el.focus(); el.style.height="auto"; el.style.height=Math.min(el.scrollHeight,120)+"px"; } },50);
+}
+function handleCancelSuggestions(){
+  setState(s=>{ s.suggOpen=false; }, updateSuggBox);
+}
+
+/* ── Books ── */
+async function generateBookProposal(){
+  const newBookId = newId();
+  const eventsToArchive = S.memory.events;
+  const actsToArchive = S.memory.acts;
+  const questsToFile = (S.player.completedQuests||[]).filter(q=>q.completedBookId===null);
+  const ongoingQuest = S.player.quest;
+
+  const questSummaryLines = [
+    ...questsToFile.map(q=>`- "${q.title}" (${q.outcome==="failed"?"failed":"completed"}): ${q.desc}`),
+    ...(ongoingQuest ? [`- "${ongoingQuest.title}" (still ongoing): ${ongoingQuest.desc}`] : [])
+  ].join("\n") || "None";
+
+  const histText = S.history.map(h=>`${h.role==="user"?"Player":"Story"}: ${h.content}`).join("\n") || "None";
+  const eventsText = eventsToArchive.map(e=>"- "+e.text).join("\n") || "None";
+  const actsText = actsToArchive.map(a=>"- "+a.text).join("\n") || "None";
+
+  const prompt=`You are closing out a chapter ("Book") of an ongoing story. Below is everything that has happened since the last Book (or since the story began, if this is the first).\n\nRecent raw scenes:\n${histText}\n\nEvents since last Book:\n${eventsText}\n\nActs since last Book:\n${actsText}\n\nQuests active in this span:\n${questSummaryLines}\n\nPlayer character's current description: "${S.player.desc.trim()||"none given"}"\n\nWrite:\n1. A short evocative chapter title (5-8 words).\n2. A comprehensive but concise "story so far" summary (5-8 sentences) covering everything that happened in this span, preserving named characters, open threads, and specific commitments \u2014 this will REPLACE all the detailed events/acts above as the ongoing memory of this period, so do not omit anything a future scene might need to stay consistent with.\n3. OPTIONAL character evolution: if events in this span plausibly changed something about the player character's outlook, reputation, relationships, or manner (NOT their core identity, name, or gender), propose a short addendum sentence reflecting that growth. If nothing has meaningfully changed, return null.\n\nReturn ONLY raw JSON: {"title":"...","summary":"...","characterEvolution":"... or null"}`;
+
+  const raw=await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",900);
+  const parsed=parseJSON(raw,null);
+  if(!parsed || !parsed.title || !parsed.summary){
+    if(looksLikeDecline(raw)){
+      throw new Error("The story engine declined to summarize this chapter as described. Try again, or start the Book from a different point.");
+    }
+    throw new Error("Could not generate a Book summary \u2014 try again.");
+  }
+  return {newBookId,eventsToArchive,actsToArchive,questsToFile,ongoingQuest,title:parsed.title,summary:parsed.summary,characterEvolution:parsed.characterEvolution||null};
+}
+
+async function handleStartBook(){
+  if(busy())return;
+  S.status="booking";
+  S.bookSuggestion=false;
+  render();
+  try{
+    const proposal=await generateBookProposal();
+    S.bookModal={...proposal,charChoice:proposal.characterEvolution?"accept":"decline",charText:proposal.characterEvolution||""};
+    S.modalTab="book";
+    S.tabsViewed={book:true,personality:!proposal.characterEvolution};
+  }catch(err){
+    S.msgs=[...S.msgs,{type:"error",text:err.message||"Error",retry:{kind:"book",payload:{}}}];
+    S.status="idle";
+    appendMessage(S.msgs[S.msgs.length-1]);
+  }
+  render();
+  persistSession();
+}
+
+function switchModalTab(tab){
+  setState(s=>{
+    s.modalTab=tab;
+    s.tabsViewed={...s.tabsViewed,[tab]:true};
+  }, updateBookModal);
+}
+
+function setBookCharChoice(choice){
+  if(!S.bookModal) return;
+  setState(s=>{
+    s.bookModal={...s.bookModal,charChoice:choice,charText:choice==="decline"?"":(s.bookModal.charText||s.bookModal.characterEvolution)};
+  }, updateBookModal);
+}
+function setBookCharText(val){
+  if(!S.bookModal) return;
+  S.bookModal.charText=val;
+  // Update just the "final combined result" preview without a full re-render
+  const preview=document.getElementById("bookFinalPreview");
+  if(preview) preview.textContent = S.bookModal.charChoice==="decline" ? (S.player.desc.trim()||"(none given)") : `${S.player.desc.trim()} ${(S.bookModal.charText||"").trim()}`.trim();
+}
+
+function handleConfirmBook(){
+  if(!S.bookModal)return;
+  const {newBookId,eventsToArchive,actsToArchive,questsToFile,ongoingQuest,title,summary,charChoice,charText}=S.bookModal;
+
+  const newBookQuests=[];
+  const earlierBookNotes={};
+  for(const q of questsToFile){
+    const failed = q.outcome==="failed";
+    if(q.startedBookId && q.startedBookId!==newBookId){
+      newBookQuests.push({title:q.title,desc:q.desc,note:failed?"Failed here \u2014 began in an earlier chapter.":"Concluded here \u2014 began in an earlier chapter."});
+      earlierBookNotes[q.startedBookId]=earlierBookNotes[q.startedBookId]||[];
+      earlierBookNotes[q.startedBookId].push({title:q.title,desc:q.desc,note:failed?"Began here \u2014 failed in a later chapter.":"Began here \u2014 concluded in a later chapter."});
+    } else {
+      newBookQuests.push({title:q.title,desc:q.desc,note:failed?"Failed here.":"Completed here."});
+    }
+  }
+  if(ongoingQuest){
+    newBookQuests.push({title:ongoingQuest.title,desc:ongoingQuest.desc,note:"Ongoing \u2014 continues beyond this chapter."});
+  }
+
+  const newBook={id:newBookId,title,summary,quests:newBookQuests,events:eventsToArchive,acts:actsToArchive,closedAt:Date.now()};
+
+  S.books = S.books.map(b=> earlierBookNotes[b.id] ? {...b,quests:[...b.quests,...earlierBookNotes[b.id]]} : b);
+  S.books = [...S.books, newBook];
+
+  S.memory = {events:eventsToArchive.slice(-2), acts:[]};
+
+  const filedTitles=new Set(questsToFile.map(q=>q.title));
+  S.player.completedQuests = (S.player.completedQuests||[]).map(q=> (filedTitles.has(q.title)&&q.completedBookId===null) ? {...q,completedBookId:newBookId} : q);
+  S.player.quest = S.player.quest && !S.player.quest.startedBookId ? {...S.player.quest,startedBookId:newBookId} : S.player.quest;
+  S.player.desc = (charChoice==="accept"||charChoice==="edit") && charText.trim() ? `${S.player.desc.trim()} ${charText.trim()}`.trim() : S.player.desc;
+
+  S.bookModal=null;
+  S.activeBookTab=S.books.length-1;
+  S.msgs=[...S.msgs,{type:"bookmark",text:title}];
+  S.status="idle";
+  render(); // safety-net refresh (panels, save bar, input state, etc.)
+  appendMessage(S.msgs[S.msgs.length-1]); // targeted: just append the bookmark divider
+  persistSession();
+}
+
+function handleCancelBookModal(){
+  S.bookModal=null;
+  S.status="idle";
+  render();
+}
+
+async function handleSubmit(){
+  const action=(S.input||"").trim();
+  if(!action||busy())return;
+  S.input="";
+  S.suggestions=null; S.suggOpen=false;
+  S.msgs=[...S.msgs,{type:"player",text:action}];
+  appendMessage(S.msgs[S.msgs.length-1]); // targeted: append the player's line without rebuilding the log
+  await runStep(()=>narratorTurnCore(action),"submit",{action});
+}
+
+async function handleContinue(){
+  if(busy())return;
+  S.suggestions=null; S.suggOpen=false;
+  await runStep(continueTurnCore,"continue",{});
+}
+
+function handleChoice(idx){
+  if(!S.challengeData||S.challengeData.revealed)return;
+  const btnType=S.challengeData.buttons[idx];
+  const outcome=btnType==="fate"?OUTCOMES[Math.floor(Math.random()*4)]:btnType;
+  const pendingV=S.challengeData.pending;
+  S.challengeData={...S.challengeData,revealed:{idx,outcome,btnType}};
+  render();
+  setTimeout(async()=>{
+    const meta=OUTCOME_META[outcome];
+    await runStep(()=>outcomeTurnCore(pendingV,outcome,meta),"choice",{pending:pendingV,outcome,meta});
+    S.challengeData=null;
+    render();
+  },1800);
+}
+
+function handleRegenerate(idx,retry){
+  if(busy())return;
+  if(retry.kind==="start"){
+    S.msgs = S.msgs.filter((_,i)=>i!==idx);
+    startGame();
+  } else if(retry.kind==="continue"){
+    S.msgs = S.msgs.filter((_,i)=>i!==idx);
+    removeMessageNode(idx);
+    handleContinue();
+  } else if(retry.kind==="submit"){
+    runStep(()=>narratorTurnCore(retry.payload.action),"submit",retry.payload,idx);
+  } else if(retry.kind==="choice"){
+    runStep(()=>outcomeTurnCore(retry.payload.pending,retry.payload.outcome,retry.payload.meta),"choice",retry.payload,idx);
+  } else if(retry.kind==="book"){
+    S.msgs = S.msgs.filter((_,i)=>i!==idx);
+    removeMessageNode(idx);
+    handleStartBook();
+  }
+}
+
+/* ── Entry points ── */
+async function startGame(){
+  const m=S.mood, s=S.setting, e=S.engine, g=S.player.gender, d=S.player.desc;
+  gameMounted=false; // force a full remount \u2014 this wipes the previous tale's log
+  S.screen="game";
+  S.msgs=[];
+  S.saveTracking={activeSaveId:null,turnsAtSave:0,result:null,message:null};
+  S.history=[];
+  S.memory=JSON.parse(JSON.stringify(DEFAULT_MEMORY));
+  S.books=[];
+  S.bookSuggestion=false; S.bookModal=null;
+  S.suggestions=null; S.suggOpen=false;
+  S.lastSaveTurnCount=0;
+  S.player.quest=null; S.player.keyItems=[]; S.player.items=[]; S.player.characters=[]; S.player.completedQuests=[]; S.player.names=[]; S.player.conditions=JSON.parse(JSON.stringify(DEFAULT_CONDITIONS));
+  S.status="narrating";
+  render();
+  const results = await Promise.all([deriveTools(g,d,s,e), deriveCharacterNames(d)]);
+  const toolsResult=results[0], namesResult=results[1];
+  S.player.tools=toolsResult; S.player.names=namesResult;
+  const sObj=SETTINGS.find(x=>x.key===s); const sl=sObj?sObj.label:s;
+  const eObj=ENGINES.find(x=>x.key===e); const el=eObj?eObj.label:e;
+  const ml=(MOODS.find(x=>x.key===m)||{}).label||m;
+  const pInfo={gender:g,desc:d.trim()};
+  const pBits=[];
+  if(g!=="undefined") pBits.push(`a ${g} character`);
+  if(d.trim()) pBits.push(`described as: ${d.trim()}`);
+  pBits.push(`occupation: ${toolsResult.occupation} (carries: ${toolsResult.kit})`);
+  const pClause = ` The player character is ${pBits.join(", ")}.`;
+  const metaLine = `${ml} \u00b7 ${sl} \u00b7 ${el}`;
+  S.msgs=[{type:"meta",text:metaLine}];
+  const msgListEl=document.getElementById("msgList");
+  if(msgListEl) msgListEl.innerHTML = renderMsgListHtml();
+
+  await runStep(async()=>{
+    const text=await callClaude([{role:"user",content:`Begin a new story set in a ${sl} world, with a ${el==="Story-Driven"?"plot that emerges naturally from the setting":el+" plot engine"}, and a ${ml} tone.${pClause} Vivid atmospheric opening, immediate tension, end on a moment of choice. 2\u20133 paragraphs, second person. Bold character names, italicise place names.`}],buildSystem(m,s,e,pInfo));
+    S.msgs=[...S.msgs,{type:"narrator",text}];
+    appendMessage(S.msgs[S.msgs.length-1]);
+    S.history=[{role:"assistant",content:text}];
+    await tagQuestFromExtraction(text,pInfo,{tools:toolsResult,quest:null,keyItems:[],items:[],characters:[],conditions:JSON.parse(JSON.stringify(DEFAULT_CONDITIONS))});
+    refreshLastMessageNode();
+  },"start",{});
+}
+
+/* ── Save management ── */
+async function handleSaveCurrent(asNew){
+  if(busy())return;
+  S.status="saving";
+  render();
+  const id = (!asNew && S.saveTracking.activeSaveId) ? S.saveTracking.activeSaveId : newId();
+  const existing = S.saveList.find(s=>s.id===id);
+  let name = existing ? existing.name : undefined;
+  if(!name){
+    const engineLabel = S.engine!=="story_driven" ? ` ${labelFor(ENGINES,S.engine)}` : "";
+    const namesSuffix = (S.player.names && S.player.names.length) ? ` \u2014 ${S.player.names.join(" / ")}` : "";
+    name = `${labelFor(MOODS,S.mood)} ${labelFor(SETTINGS,S.setting)}${engineLabel} Tale${namesSuffix}`;
+  }
+  let resultMsg=null;
+  try{
+    const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
+      gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,
+      savedAt:Date.now()};
+    const payloadStr=JSON.stringify(payload);
+    if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
+      throw new Error("This tale is too large to save (near the per-save storage limit). Export it now to back it up, then free space by deleting other saves.");
+    }
+    const res=await window.storage.set(saveKey(id),payloadStr);
+    if(!res) throw new Error("Storage write did not complete \u2014 you may be at your total storage limit for this game.");
+    const ids=await getSaveIndex();
+    if(!ids.includes(id)){ids.push(id);await setSaveIndex(ids);}
+    S.saveTracking={activeSaveId:id,turnsAtSave:S.msgs.filter(m=>m.type==="narrator").length,result:"saved",message:null};
+    S.lastSaveTurnCount=S.msgs.filter(m=>m.type==="narrator").length;
+    await refreshSaveList();
+  }catch(err){
+    resultMsg = err.message || "Unknown error";
+    S.saveTracking={...S.saveTracking,result:"error",message:resultMsg};
+  }
+  S.status="idle";
+  render();
+  setTimeout(()=>{ S.saveTracking={...S.saveTracking,result:null,message:null}; render(); },resultMsg?5000:2200);
+}
+
+async function handleLoadSave(id){
+  if(busy())return;
+  S.status="loading_save";
+  render();
+  try{
+    const r=await window.storage.get(saveKey(id));
+    if(!r || !r.value){
+      S.saveTracking={...S.saveTracking,result:"error",message:null};
+      S.status="idle";
+      render();
+      return;
+    }
+    const d=JSON.parse(r.value);
+    S.msgs=d.msgs||[]; S.history=d.history||[]; S.mood=d.mood||null;
+    S.setting=d.setting||null; S.engine=d.engine||"story_driven";
+    S.player={
+      gender:d.gender||"undefined",desc:d.desc||"",
+      quest:d.quest||null,keyItems:d.keyItems||[],items:d.items||[],tools:d.tools||null,
+      characters:(d.characters||[]).map(c=>{
+        const base = c.names?c:{...c,names:[c.name].filter(Boolean)};
+        const cleaned=[...new Set(base.names.filter(n=>n && !n.includes(" / ")))];
+        return {...base,names: cleaned.length?cleaned:base.names};
+      }),completedQuests:d.completedQuests||[],names:d.names||[],
+      conditions:d.conditions||JSON.parse(JSON.stringify(DEFAULT_CONDITIONS)),
+    };
+    S.memory=d.memory||JSON.parse(JSON.stringify(DEFAULT_MEMORY));
+    S.books=d.books||[];
+    S.activeBookTab=Math.max(0,(d.books||[]).length-1);
+    S.saveTracking={activeSaveId:id,turnsAtSave:(d.msgs||[]).filter(m=>m.type==="narrator").length,result:"loaded",message:null};
+    S.lastSaveTurnCount=(d.msgs||[]).filter(m=>m.type==="narrator").length;
+    S.challengeData=null; S.input=""; S.screen="game";
+    S.suggestions=null; S.suggOpen=false;
+    S.bookSuggestion=false; S.bookModal=null;
+    gameMounted=false; // force a full remount so the loaded log/panels are fresh
+  }catch(e){
+    S.saveTracking={...S.saveTracking,result:"error",message:null};
+  }
+  S.status="idle";
+  render();
+  persistSession();
+  scrollBottom();
+  setTimeout(()=>{ S.saveTracking={...S.saveTracking,result:null,message:null}; render(); },2200);
+  setTimeout(()=>{ const el=document.getElementById("mainInput"); if(el) el.focus(); },100);
+}
+
+async function handleDeleteSave(id,ev){
+  if(ev) ev.stopPropagation();
+  if(busy())return;
+  try{
+    await window.storage.delete(saveKey(id));
+    const ids=await getSaveIndex();
+    await setSaveIndex(ids.filter(x=>x!==id));
+    if(S.saveTracking.activeSaveId===id) S.saveTracking={...S.saveTracking,activeSaveId:null};
+    if(id===AUTOSAVE_ID) S.autosaveMeta=null;
+    await refreshSaveList();
+  }catch(e){}
+}
+
+async function handleRenameSave(id,newNameVal){
+  const trimmed=(newNameVal||"").trim();
+  if(!trimmed){ S.renamingId=null; render(); return; }
+  try{
+    const r=await window.storage.get(saveKey(id));
+    if(r && r.value){
+      const d=JSON.parse(r.value);
+      d.name=trimmed;
+      const payloadStr=JSON.stringify(d);
+      if(byteLength(payloadStr)<=SAVE_SIZE_LIMIT_BYTES){
+        await window.storage.set(saveKey(id),payloadStr);
+        await refreshSaveList();
+      }
+    }
+  }catch(e){}
+  S.renamingId=null;
+  render();
+}
+
+async function handleExportSave(id,ev){
+  if(ev) ev.stopPropagation();
+  try{
+    const r=await window.storage.get(saveKey(id));
+    if(!r || !r.value)return;
+    const d=JSON.parse(r.value);
+    const blob=new Blob([JSON.stringify(d,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    const safeName=(d.name||"tale").replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_")||"tale";
+    a.href=url; a.download=`${safeName}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }catch(e){}
+}
+
+function handleImportFile(ev){
+  if(busy()){ ev.target.value=""; return; }
+  const file=ev.target.files && ev.target.files[0];
+  if(!file)return;
+  S.importStatus=null;
+  render();
+  const reader=new FileReader();
+  reader.onload=async(fev)=>{
+    let d;
+    try{ d=JSON.parse(fev.target.result); }
+    catch(e){ S.importStatus="error"; render(); ev.target.value=""; return; }
+    if(!d || !d.name || !d.msgs){ S.importStatus="error"; render(); ev.target.value=""; return; }
+    try{
+      const id=newId();
+      d.savedAt=Date.now();
+      const payloadStr=JSON.stringify(d);
+      if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){ S.importStatus="too_large"; render(); ev.target.value=""; return; }
+      const res=await window.storage.set(saveKey(id),payloadStr);
+      if(!res) throw new Error("write failed");
+      const ids=await getSaveIndex();
+      ids.push(id);
+      await setSaveIndex(ids);
+      await refreshSaveList();
+      S.importStatus="ok";
+    }catch(e){ S.importStatus="error"; }
+    render();
+    ev.target.value="";
+  };
+  reader.readAsText(file);
+}
+
+/* ============================== RENDERING ============================== */
+
+function scrollBottom(){
+  const el=document.getElementById("msgScroll");
+  if(el) el.scrollTop=el.scrollHeight;
+}
+
+function smBtnHtml(label,act,dataAttrs,disabled){
+  const da = dataAttrs ? Object.keys(dataAttrs).map(k=>`data-${k}="${attr(dataAttrs[k])}"`).join(" ") : "";
+  return `<button class="smbtn" data-act="${attr(act)}" ${da} ${disabled?"disabled":""}>${label}</button>`;
+}
+
+function toggleThemeBtnHtml(){
+  return `<button id="themeToggleBtn" class="toggle-theme-btn" data-act="toggleTheme">${S.dark?"\u2600 Light":"\u263e Dark"}</button>`;
+}
+
+function settingsIconBtnHtml(){
+  return `<button id="settingsIconBtn" class="toggle-theme-btn" data-act="openSettings" title="Anthropic API key settings">\u2699</button>`;
+}
+
+function headerBarHtml(rightExtra){
+  return `<div class="hdr">
+    <div style="flex:1"></div>
+    <span style="flex:0 0 auto;font-size:15px;color:var(--acc);letter-spacing:4px;text-transform:uppercase">\u25c8 &nbsp; The Woven Fate &nbsp; \u25c8</span>
+    <div style="flex:1;display:flex;justify-content:flex-end;gap:8px;align-items:center">
+      ${settingsIconBtnHtml()}
+      ${toggleThemeBtnHtml()}
+      ${rightExtra||""}
+    </div>
+  </div>`;
+}
+
+/* ---- API target settings modal ----
+   Reachable from every screen via the gear icon in the header. Also opened
+   automatically by callClaude() (and by the setup screen's gate) whenever
+   a request or a new game needs a target that isn't configured yet \u2014
+   functions as the "initial config screen" for a fresh install, without
+   permanently blocking the rest of the app. Two modes: a "list" of saved
+   targets to pick/edit/delete, and a "form" for adding or editing one. */
+function renderSettingsModalHtml(){
+  if(!S.settingsOpen) return "";
+  const forcedEmpty = S.apiTargets.length===0;
+  const mode = forcedEmpty ? "form" : S.settingsMode;
+
+  let body;
+  if(mode==="form"){
+    const editing = S.editingTargetId ? S.apiTargets.find(t=>t.id===S.editingTargetId) : null;
+    const host = safeHostname(S.targetForm.url);
+    const isLocal = isLocalOrIpHost(host);
+    const providerDef = PROVIDERS[S.targetForm.provider] || null;
+    const providerChosen = !!providerDef;
+    const modelPlaceholder = providerDef && providerDef.defaultModel ? `e.g. ${providerDef.defaultModel}` : (providerDef ? "required for this service" : "choose a service type first");
+    const providerOptions = `<option value="" ${S.targetForm.provider===""?"selected":""} disabled>\u2014 Select service type \u2014</option>`
+      + PROVIDER_LIST.map(p=>`<option value="${attr(p.id)}" ${S.targetForm.provider===p.id?"selected":""}>${escapeHtml(p.label)}</option>`).join("");
+    body = `
+      <div style="color:var(--textD);font-size:12px;line-height:1.5">
+        ${forcedEmpty
+          ? `No API target is configured yet, so there's nowhere to send story requests. Add one below \u2014 Anthropic, OpenAI, Gemini, and several OpenAI-compatible services (Groq, Mistral, DeepSeek, and more) are all detected automatically from the URL; local servers like Ollama need the service type picked manually.`
+          : `Calls are made directly from your browser to whatever URL you enter here. The service type is auto-detected from the URL where possible \u2014 override it any time. Leave the key blank if the target doesn't need one.`}
+      </div>
+      <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">Name</label>
+      <input id="targetNameInput" type="text" autocomplete="off" placeholder="e.g. Anthropic (personal key)" value="${attr(S.targetForm.name)}" style="width:100%;box-sizing:border-box;font-size:13px"/>
+      <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">Service URL</label>
+      <input id="targetUrlInput" type="text" autocomplete="off" spellcheck="false" placeholder="${attr(API_CONFIG.defaultUrl)}" value="${attr(S.targetForm.url)}" style="width:100%;box-sizing:border-box;font-size:13px"/>
+      <div style="font-size:10px;color:var(--textD);margin-top:-8px">A bare origin (e.g. <code>https://api.openai.com</code>) gets the right path appended automatically; paste a full URL (with path) to use it exactly as given.</div>
+      ${isLocal ? `<div style="font-size:10px;color:var(--bookClr);margin-top:-4px">This looks like a local/IP address \u2014 it can't be auto-detected, so pick the matching service type below (e.g. Ollama or LM Studio are OpenAI-compatible).</div>` : ""}
+      <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">Service Type</label>
+      <select id="targetProviderInput" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;background:var(--iBg);border:1px solid var(--bdrM);border-radius:4px;color:var(--text)">${providerOptions}</select>
+      <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">Model <span style="text-transform:none;opacity:0.8">(optional override)</span></label>
+      <input id="targetModelInput" type="text" autocomplete="off" spellcheck="false" placeholder="${attr(modelPlaceholder)}" value="${attr(S.targetForm.model)}" style="width:100%;box-sizing:border-box;font-size:13px"/>
+      <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">API Key <span style="text-transform:none;opacity:0.8">(optional)</span></label>
+      <div style="display:flex;gap:6px">
+        <input id="targetKeyInput" type="${S.apiKeyVisible?"text":"password"}" autocomplete="off" spellcheck="false" placeholder="leave blank if not required" value="${attr(S.targetForm.key)}" style="flex:1;box-sizing:border-box;font-size:13px"/>
+        <button data-act="toggleApiKeyVisibility" style="background:none;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);font-size:11px;cursor:pointer;padding:4px 9px;outline:none;flex-shrink:0">${S.apiKeyVisible?"Hide":"Show"}</button>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        ${(!forcedEmpty) ? `<button data-act="cancelTargetForm" style="padding:7px 16px;background:transparent;border:1px solid var(--bdrC);border-radius:4px;color:var(--textM);cursor:pointer;font-size:13px;outline:none">Cancel</button>` : ""}
+        <button id="saveTargetFormBtn" data-act="saveTargetForm" data-editing-id="${attr(S.editingTargetId||"")}" ${providerChosen?"":"disabled"} style="padding:7px 20px;background:transparent;border:1px solid ${providerChosen?"var(--acc)":"var(--bdrM)"};border-radius:4px;color:${providerChosen?"var(--accHi)":"var(--accLo)"};cursor:${providerChosen?"pointer":"not-allowed"};font-size:13px;outline:none">${editing?"Save Changes":"Add Target"}</button>
+      </div>`;
+  } else {
+    const rows = S.apiTargets.map(t=>{
+      const active = t.id===S.activeTargetId;
+      return `<div style="border:1px solid ${active?"var(--acc)":"var(--cardBdr)"};border-radius:6px;padding:10px 12px;background:${active?"var(--pABg)":"var(--bgCard)"};display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="min-width:0;cursor:pointer" data-act="selectTarget" data-id="${attr(t.id)}">
+          <div style="color:${active?"var(--accHi)":"var(--text)"};font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${active?"\u2726 ":""}${escapeHtml(t.name)}</div>
+          <div style="color:var(--textD);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(targetSummary(t))}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button data-act="editTarget" data-id="${attr(t.id)}" style="background:none;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);font-size:11px;cursor:pointer;padding:4px 9px;outline:none">Edit</button>
+          <button data-act="deleteTarget" data-id="${attr(t.id)}" style="background:none;border:none;color:var(--delClr);font-size:15px;cursor:pointer;padding:4px 7px;outline:none;opacity:0.75">\u2715</button>
+        </div>
+      </div>`;
+    }).join("");
+    body = `
+      <div style="color:var(--textD);font-size:12px;line-height:1.5">
+        Calls are made directly from your browser to whichever target is selected. Add as many as you like \u2014 Anthropic, OpenAI, Gemini, other providers, or a self-hosted/local server \u2014 and switch between them any time.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto">${rows}</div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button data-act="closeSettings" style="padding:7px 16px;background:transparent;border:1px solid var(--bdrC);border-radius:4px;color:var(--textM);cursor:pointer;font-size:13px;outline:none">Close</button>
+        <button data-act="newTargetForm" style="padding:7px 20px;background:transparent;border:1px solid var(--acc);border-radius:4px;color:var(--accHi);cursor:pointer;font-size:13px;outline:none">+ Add Target</button>
+      </div>`;
+  }
+
+  return `<div class="modal-overlay">
+    <div class="modal-box" style="max-width:460px">
+      <div style="color:var(--acc);font-size:11px;letter-spacing:2px;text-transform:uppercase">\u2699 API Targets</div>
+      ${body}
+    </div>
+  </div>`;
+}
+function updateSettingsModal(){
+  const el=document.getElementById("settingsModalContainer");
+  if(el) el.innerHTML = renderSettingsModalHtml();
+}
+function blankTargetForm(){
+  const url = API_CONFIG.defaultUrl;
+  return {name:"", url, provider: detectProviderId(url) || "", model:"", key:"", _lastDetectedUrl:url};
+}
+function openSettingsModal(){
+  S.settingsOpen = true;
+  S.settingsMode = S.apiTargets.length ? "list" : "form";
+  if(S.settingsMode==="form"){ S.editingTargetId=null; S.targetForm=blankTargetForm(); }
+  updateSettingsModal();
+  setTimeout(()=>{ const el=document.getElementById("targetNameInput")||document.getElementById("targetUrlInput"); if(el) el.focus(); },30);
+}
+function openNewTargetForm(){
+  S.settingsMode="form"; S.editingTargetId=null; S.targetForm=blankTargetForm();
+  updateSettingsModal();
+  setTimeout(()=>{ const el=document.getElementById("targetNameInput"); if(el) el.focus(); },30);
+}
+function openEditTargetForm(id){
+  const t=S.apiTargets.find(x=>x.id===id);
+  if(!t) return;
+  S.settingsMode="form"; S.editingTargetId=id;
+  S.targetForm={name:t.name, url:t.url, provider:t.provider||"", model:t.model||"", key:t.key, _lastDetectedUrl:t.url};
+  updateSettingsModal();
+  setTimeout(()=>{ const el=document.getElementById("targetNameInput"); if(el) el.focus(); },30);
+}
+/* Re-runs hostname-based provider detection when the Service URL field is
+   blurred. Only overwrites the Service Type when the URL actually changed
+   since the last check (so re-focusing/blurring the same value repeatedly
+   can't stomp on a choice the user already made), and never invents a
+   confident guess for a localhost/IP address \u2014 that always falls back to
+   requiring an explicit manual pick, per how ambiguous local endpoints are. */
+function handleTargetUrlBlur(){
+  const urlEl=document.getElementById("targetUrlInput");
+  if(!urlEl) return;
+  const url=urlEl.value;
+  if(url===S.targetForm._lastDetectedUrl) return;
+  S.targetForm._lastDetectedUrl = url;
+  const detected = detectProviderId(url);
+  if(detected){ S.targetForm.provider = detected; }
+  else if(isLocalOrIpHost(safeHostname(url))){ S.targetForm.provider = ""; }
+  updateSettingsModal();
+  setTimeout(()=>{ const el=document.getElementById("targetUrlInput"); if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); } },0);
+}
+
+/* ---- Screen mount tracking ----
+   `render()` is the single entry point every handler calls after a state
+   change. Setup/Saves are cheap enough to always fully rebuild. The game
+   screen is the one with hot, focus-sensitive state (the action textarea,
+   scroll position, in-flight narration) so it is mounted once and then only
+   ever patched via the targeted update*()/append*() functions below \u2014
+   render() falls back to a full-but-safe refreshGameScreen() for any call
+   site that hasn't been given a more specific update. */
+let gameMounted = false;
+
+function render(){
+  applyThemeVars();
+  const app=document.getElementById("app");
+  if(S.screen==="saves"){ gameMounted=false; app.innerHTML=renderSavesScreen(); }
+  else if(S.screen==="setup"){ gameMounted=false; app.innerHTML=renderSetupScreen(); }
+  else {
+    if(!gameMounted){ mountGameScreen(); gameMounted=true; }
+    else { refreshGameScreen(); }
+  }
+}
+
+/* ── Saves screen ── */
+function renderSavesScreen(){
+  const b=busy();
+  const backTarget = S.msgs.length>0 ? "game" : "setup";
+  const rightExtra = `<button class="link-btn" data-act="goScreen" data-screen="${backTarget}" style="color:${b?"var(--accLo)":"var(--newBtn)"};font-size:11px;cursor:${b?"not-allowed":"pointer"}" ${b?"disabled":""}>Back</button>`;
+
+  let importMsg="";
+  if(S.importStatus==="ok") importMsg=`<div style="text-align:center;font-size:11px;color:${OUTCOME_META.success.color};margin-bottom:14px">\u2726 Imported successfully</div>`;
+  else if(S.importStatus==="error") importMsg=`<div style="text-align:center;font-size:11px;color:${OUTCOME_META.failure.color};margin-bottom:14px">\u2717 Invalid save file</div>`;
+  else if(S.importStatus==="too_large") importMsg=`<div style="text-align:center;font-size:11px;color:${OUTCOME_META.failure.color};margin-bottom:14px">\u2717 This file exceeds the per-save storage limit and can't be imported</div>`;
+
+  let list="";
+  if(S.savesLoading) list=`<div style="text-align:center;color:var(--think);font-style:italic;font-size:13px;margin-top:10px">Gathering threads\u2026</div>`;
+  if(!S.savesLoading && S.saveList.length===0 && !S.autosaveMeta) list+=`<div style="text-align:center;color:var(--textD);font-size:13px;margin-top:10px">No saved tales yet.</div>`;
+
+  let cards="";
+  if(S.autosaveMeta){
+    const am=S.autosaveMeta;
+    cards+=`<div data-act="loadSave" data-id="${attr(AUTOSAVE_ID)}" style="cursor:${b?"not-allowed":"pointer"};opacity:${b?0.6:1};border:1px dashed var(--bookClr);border-radius:6px;padding:12px 14px;background:var(--bgCard);display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div style="min-width:0">
+        <div style="color:var(--bookClr);font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\u27f3 ${escapeHtml(am.name)}</div>
+        <div style="color:var(--textD);font-size:11px;letter-spacing:0.5px">${escapeHtml(labelFor(MOODS,am.mood))} \u00b7 ${escapeHtml(labelFor(SETTINGS,am.setting))} \u00b7 ${escapeHtml(labelFor(ENGINES,am.engine))} &nbsp;\u00b7&nbsp; ${escapeHtml(new Date(am.savedAt).toLocaleString())}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <button data-act="exportSave" data-id="${attr(AUTOSAVE_ID)}" style="background:none;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);font-size:11px;cursor:pointer;padding:4px 9px;outline:none">Export</button>
+        <button data-act="deleteSave" data-id="${attr(AUTOSAVE_ID)}" ${b?"disabled":""} style="background:none;border:none;color:var(--delClr);font-size:16px;cursor:${b?"not-allowed":"pointer"};padding:4px 8px;outline:none;opacity:${b?0.4:0.7}">\u2715</button>
+      </div>
+    </div>`;
+  }
+  S.saveList.forEach(sv=>{
+    const ml=labelFor(MOODS,sv.mood), sl=labelFor(SETTINGS,sv.setting), el=labelFor(ENGINES,sv.engine);
+    if(S.renamingId===sv.id){
+      cards+=`<div style="border:1px solid var(--cardBdr);border-radius:6px;padding:12px 14px;background:var(--bgCard);display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="renameInput" type="text" value="${attr(S.renameText)}" style="flex:1;background:var(--iBg);border:1px solid var(--bdrM);border-radius:4px;padding:5px 8px;color:var(--text);font-size:13px;outline:none" autofocus/>
+            <button data-act="renameSave" data-id="${attr(sv.id)}" style="background:none;border:1px solid var(--acc);border-radius:4px;color:var(--accHi);font-size:11px;cursor:pointer;padding:4px 9px;outline:none">Save</button>
+            <button data-act="renameCancel" style="background:none;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);font-size:11px;cursor:pointer;padding:4px 9px;outline:none">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      cards+=`<div data-act="loadSave" data-id="${attr(sv.id)}" style="cursor:${b?"not-allowed":"pointer"};opacity:${b?0.6:1};border:1px solid var(--cardBdr);border-radius:6px;padding:12px 14px;background:var(--bgCard);display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="color:var(--accHi);font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(sv.name)}</div>
+          <div style="color:var(--textD);font-size:11px;letter-spacing:0.5px">${escapeHtml(ml)} \u00b7 ${escapeHtml(sl)} \u00b7 ${escapeHtml(el)} &nbsp;\u00b7&nbsp; ${escapeHtml(new Date(sv.savedAt).toLocaleString())}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+          <button data-act="renameStart" data-id="${attr(sv.id)}" data-name="${attr(sv.name)}" style="background:none;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);font-size:11px;cursor:pointer;padding:4px 9px;outline:none">Rename</button>
+          <button data-act="exportSave" data-id="${attr(sv.id)}" style="background:none;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);font-size:11px;cursor:pointer;padding:4px 9px;outline:none">Export</button>
+          <button data-act="deleteSave" data-id="${attr(sv.id)}" ${b?"disabled":""} style="background:none;border:none;color:var(--delClr);font-size:16px;cursor:${b?"not-allowed":"pointer"};padding:4px 8px;outline:none;opacity:${b?0.4:0.7}">\u2715</button>
+        </div>
+      </div>`;
+    }
+  });
+
+  return `<div class="hdr-wrap">
+    ${headerBarHtml(rightExtra)}
+    <div style="flex:1;overflow-y:auto;padding:24px 26px">
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:8px;position:relative">
+        <div style="color:var(--textM);font-size:13px;letter-spacing:2px;text-transform:uppercase">Your Tales</div>
+        <label style="position:absolute;right:0;display:inline-block;padding:5px 14px;background:transparent;border:1px solid ${b?"var(--bdrM)":"var(--acc)"};border-radius:4px;color:${b?"var(--accLo)":"var(--accHi)"};cursor:${b?"not-allowed":"pointer"};font-size:11px;letter-spacing:0.5px">
+          Import\u2026
+          <input type="file" accept="application/json,.json" id="importFileInput" ${b?"disabled":""} style="display:none"/>
+        </label>
+      </div>
+      ${importMsg}
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:18px">
+        <span style="font-size:11px;color:var(--textD);letter-spacing:1px">Autosave every ${AUTOSAVE_INTERVAL} turns</span>
+        <button data-act="toggleAutosave" style="padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;border:1px solid ${S.autosaveEnabled?"var(--acc)":"var(--bdrM)"};background:${S.autosaveEnabled?"var(--pABg)":"transparent"};color:${S.autosaveEnabled?"var(--accHi)":"var(--textM)"};outline:none">${S.autosaveEnabled?"On":"Off"}</button>
+      </div>
+      ${list}
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${cards}</div>
+    </div>
+  </div>
+  <div id="settingsModalContainer">${renderSettingsModalHtml()}</div>`;
+}
+
+/* ── Setup screen ── */
+function renderSetupScreen(){
+  const moodGrid = MOODS.map(m=>{
+    const active = S.mood===m.key;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+      <button data-act="setMood" data-key="${attr(m.key)}" class="fade-btn" style="width:100%;padding:7px 8px;font-size:13px;letter-spacing:0.5px;border:1px solid ${active?"var(--pABdr)":"var(--bdrM)"};background:${active?"var(--pABg)":"transparent"};color:${active?"var(--pAClr)":"var(--textM)"}">${escapeHtml(m.label)}</button>
+      <span style="font-size:10px;color:var(--textD);text-align:center">${escapeHtml(m.hint)}</span>
+    </div>`;
+  }).join("");
+
+  const settingGrid = SETTINGS.map(g=>{
+    const active = S.setting===g.key;
+    return `<button data-act="setSetting" data-key="${attr(g.key)}" class="fade-btn" style="padding:10px 6px;font-size:12px;letter-spacing:0.5px;border:1px solid ${active?"var(--gABdr)":"var(--bdrM)"};background:${active?"var(--gABg)":"var(--bgGenre)"};color:${active?"var(--gAClr)":"var(--textM)"};display:flex;flex-direction:column;align-items:center;gap:5px">
+      <span style="font-size:16px;line-height:1">${g.icon}</span><span>${escapeHtml(g.label)}</span>
+    </button>`;
+  }).join("");
+
+  const engineGrid = ENGINES.map(g=>{
+    const active = S.engine===g.key;
+    return `<button data-act="setEngine" data-key="${attr(g.key)}" class="fade-btn" style="padding:10px 6px;font-size:11px;letter-spacing:0.3px;border:1px solid ${active?"var(--gABdr)":"var(--bdrM)"};background:${active?"var(--gABg)":"var(--bgGenre)"};color:${active?"var(--gAClr)":"var(--textM)"};display:flex;flex-direction:column;align-items:center;gap:5px">
+      <span style="font-size:16px;line-height:1">${g.icon}</span><span style="text-align:center">${escapeHtml(g.label)}</span>
+    </button>`;
+  }).join("");
+
+  const genderRow = GENDERS.map(g=>{
+    const active = S.player.gender===g.key;
+    return `<button data-act="setGender" data-key="${attr(g.key)}" class="fade-btn" style="flex:1 1 70px;padding:7px 10px;font-size:13px;border:1px solid ${active?"var(--pABdr)":"var(--bdrM)"};background:${active?"var(--pABg)":"transparent"};color:${active?"var(--pAClr)":"var(--textM)"}">${escapeHtml(g.label)}</button>`;
+  }).join("");
+
+  const canBegin = S.mood && S.setting && !!activeTarget();
+  const resumeLine = S.saveList.length>0
+    ? `<button class="link-btn" data-act="goScreen" data-screen="saves" style="color:var(--link);font-size:12px;text-decoration:underline">Resume a saved tale (${S.saveList.length})</button>`
+    : `<button class="link-btn" data-act="goScreen" data-screen="saves" style="color:var(--link);font-size:12px;text-decoration:underline">Import a saved tale</button>`;
+
+  let targetSection;
+  if(S.apiTargets.length===0){
+    targetSection = `<div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">API Target</div>
+      <div style="border:1px dashed var(--bdrC);border-radius:6px;padding:14px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center">
+        <div style="color:var(--textD);font-size:12px">No API target configured yet \u2014 add one to begin a tale.</div>
+        <button data-act="openSettings" style="padding:7px 18px;background:transparent;border:1px solid var(--acc);border-radius:4px;color:var(--accHi);cursor:pointer;font-size:12px;outline:none">+ Add API Target</button>
+      </div>
+    </div>`;
+  } else {
+    const pills = S.apiTargets.map(t=>{
+      const active = t.id===S.activeTargetId;
+      return `<button data-act="selectTargetSetup" data-id="${attr(t.id)}" class="fade-btn" style="padding:7px 12px;font-size:12px;border:1px solid ${active?"var(--pABdr)":"var(--bdrM)"};background:${active?"var(--pABg)":"transparent"};color:${active?"var(--pAClr)":"var(--textM)"};white-space:nowrap">${active?"\u2726 ":""}${escapeHtml(t.name)}</button>`;
+    }).join("");
+    targetSection = `<div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">API Target</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${pills}
+        <button data-act="openSettings" style="padding:7px 12px;background:transparent;border:1px solid var(--bdrC);border-radius:4px;color:var(--textM);cursor:pointer;font-size:12px;outline:none">Manage\u2026</button>
+      </div>
+    </div>`;
+  }
+
+  return `${headerBarHtml("")}
+  <div style="flex:1;overflow-y:auto;padding:28px 26px 24px;display:flex;flex-direction:column;gap:26px">
+    <div style="text-align:center;color:var(--textM);font-size:13px;letter-spacing:2px;text-transform:uppercase">Choose the nature of your tale</div>
+
+    ${targetSection}
+
+    <div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Mood</div>
+      <div class="grid4">${moodGrid}</div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Setting</div>
+      <div class="grid3">${settingGrid}</div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Plot Engine</div>
+      <div class="grid4">${engineGrid}</div>
+      <div style="font-size:10px;color:var(--textD);margin-top:6px">"Story-Driven" lets the plot shape emerge from the setting and mood alone.</div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Your Character</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${genderRow}</div>
+      <textarea id="playerDescInput" placeholder="Optional: briefly describe your character \u2014 name, appearance, background, personality, occupation, companions/crew\u2026" rows="3" style="width:100%;resize:vertical;box-sizing:border-box">${escapeHtml(S.player.desc)}</textarea>
+      <div style="font-size:10px;color:var(--textD);margin-top:6px">Mentioning an occupation (e.g. "a knight", "a cowboy") or a team/crew will shape your starting tools of the trade and supporting cast.</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+      <div style="display:flex;gap:10px">
+        <button data-act="beginTale" ${canBegin?"":"disabled"} style="padding:11px 36px;background:${canBegin?"var(--bgGenre)":"transparent"};border:1px solid ${canBegin?"var(--acc)":"var(--bdrM)"};border-radius:4px;color:${canBegin?"var(--accHi)":"var(--accLo)"};cursor:${canBegin?"pointer":"not-allowed"};font-size:14px;letter-spacing:2px;text-transform:uppercase">Begin Your Tale</button>
+        <button data-act="randomize" style="padding:11px 20px;background:transparent;border:1px solid var(--bdrC);border-radius:4px;color:var(--textM);cursor:pointer;font-size:13px;letter-spacing:1px;text-transform:uppercase">Random \u2684</button>
+      </div>
+      ${!activeTarget() ? `<div style="color:var(--textD);font-size:10px;font-style:italic">Choose or add an API target above before beginning.</div>` : ""}
+      ${resumeLine}
+    </div>
+  </div>
+  <div style="text-align:center;padding:6px 0 10px;color:var(--textD);font-size:10px;letter-spacing:1px;opacity:0.6;flex-shrink:0">${APP_VERSION}</div>
+  <div id="settingsModalContainer">${renderSettingsModalHtml()}</div>`;
+}
+
+/* ── Game screen ── */
+/* ── Game screen: save/status bar ── */
+function renderSaveBarInner(){
+  const b=busy();
+  const ssText = S.saveTracking.result==="saved"?"\u2726 Saved":S.saveTracking.result==="loaded"?"\u2726 Loaded":S.saveTracking.result==="autosaved"?"\u2726 Autosaved":S.saveTracking.result==="error"?(S.saveTracking.message?`\u2717 ${S.saveTracking.message}`:"\u2717 Error"):null;
+  const ssColor = S.saveTracking.result==="error"?OUTCOME_META.failure.color:OUTCOME_META.success.color;
+  const condCount = ((S.player.conditions&&S.player.conditions.superficial&&S.player.conditions.superficial.length)||0)
+    +((S.player.conditions&&S.player.conditions.moderate&&S.player.conditions.moderate.length)||0)
+    +((S.player.conditions&&S.player.conditions.severe&&S.player.conditions.severe.length)||0)
+    +((S.player.conditions&&S.player.conditions.positive&&S.player.conditions.positive.length)||0);
+
+  let statusRight;
+  if(S.status==="saving") statusRight="Saving\u2026";
+  else if(S.status==="loading_save") statusRight="Loading\u2026";
+  else if(S.status==="booking") statusRight="Writing the chapter\u2026";
+  else if(S.saveTracking.result) statusRight=ssText;
+  else if(S.saveTracking.activeSaveId){
+    const turns=S.msgs.filter(m=>m.type==="narrator").length-S.saveTracking.turnsAtSave;
+    statusRight = turns>0?`Tracking an existing save, ${turns} turn${turns===1?"":"s"} old`:"Tracking an existing save";
+  } else statusRight="Unsaved tale";
+  const statusColor = (S.status==="saving"||S.status==="loading_save")?"var(--think)":(S.saveTracking.result?ssColor:"var(--textD)");
+
+  return `
+    ${smBtnHtml("Save","saveCurrent",{asnew:"0"},S.msgs.length===0||b)}
+    ${smBtnHtml("Save As New","saveCurrent",{asnew:"1"},S.msgs.length===0||b)}
+    ${smBtnHtml(S.statusOpen?"Hide Status":`Status${condCount?` (${condCount})`:""}`,"toggleStatus",{},false)}
+    ${smBtnHtml(S.panelOpen?"Hide Quest":"Quest & Items","togglePanel",{},false)}
+    ${smBtnHtml(S.journalOpen?"Hide Journal":"Journal","toggleJournal",{},false)}
+    ${smBtnHtml(S.booksOpen?"Hide Books":`Books${S.books.length?` (${S.books.length})`:""}`,"toggleBooks",{},false)}
+    <span style="font-size:11px;color:${statusColor};letter-spacing:1px;flex:1;text-align:right">${escapeHtml(statusRight)}</span>
+  `;
+}
+function updateSaveBar(){
+  const el=document.getElementById("sbarContainer");
+  if(el) el.innerHTML = renderSaveBarInner();
+}
+
+function updateHeaderButtons(){
+  const b=busy();
+  ["hdrSavesBtn","hdrNewBtn"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.disabled=b;
+    el.style.color = b?"var(--accLo)":"var(--newBtn)";
+    el.style.cursor = b?"not-allowed":"pointer";
+  });
+}
+
+/* ── Game screen: status / inventory / journal / books panels ── */
+function renderStatusPanelInner(){
+  const c = S.player.conditions||DEFAULT_CONDITIONS;
+  function condList(arr,color,symbol,extra){
+    if(!arr || !arr.length) return `<div style="color:var(--textD);font-style:italic">None.</div>`;
+    return arr.map(cc=>`<div style="color:${color};margin-bottom:3px">${symbol} <strong>${escapeHtml(cc.label)}</strong>${cc.desc?` \u2014 ${escapeHtml(cc.desc)}`:""}${extra&&cc.treatmentStarted?" (being treated)":""}</div>`).join("");
+  }
+  return `
+    <div><div class="panel-label">Severe (${c.severe.length}/${MAX_COND})</div>${condList(c.severe,OUTCOME_META.failure.color,"\u25c6",true)}</div>
+    <div><div class="panel-label">Moderate (${c.moderate.length}/${MAX_COND})</div>${condList(c.moderate,OUTCOME_META.mitigated_failure.color,"\u25c7")}</div>
+    <div><div class="panel-label">Superficial (${c.superficial.length}/${MAX_COND})</div>${condList(c.superficial,"var(--textM)","\u00b7")}</div>
+    <div><div class="panel-label">Positive (${c.positive.length}/${MAX_COND})</div>${condList(c.positive,OUTCOME_META.success.color,"\u2726")}</div>
+  `;
+}
+function updateStatusUI(){
+  const el=document.getElementById("panelStatus");
+  if(!el) return;
+  el.className = S.statusOpen ? "panel" : "";
+  el.innerHTML = S.statusOpen ? renderStatusPanelInner() : "";
+}
+
+function renderInventoryPanelInner(){
+  const questHtml = S.player.quest
+    ? `<div style="color:var(--text)"><strong style="color:var(--accHi)">${escapeHtml(S.player.quest.title)}</strong> \u2014 ${escapeHtml(S.player.quest.desc)}</div>`
+    : `<div style="color:var(--textD);font-style:italic">No active quest \u2014 explore and act, one may emerge.</div>`;
+  const keyItemsHtml = S.player.keyItems.length ? S.player.keyItems.map(it=>`
+    <div style="color:var(--keyClr);display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span>\u25c6 <strong>${escapeHtml(it.name)}</strong>${it.desc?` \u2014 ${escapeHtml(it.desc)}`:""}</span>
+      <button data-act="dropItem" data-kind="keyItems" data-name="${attr(it.name)}" style="background:none;border:none;color:var(--delClr);font-size:13px;cursor:pointer;padding:2px 6px;outline:none;opacity:0.7;flex-shrink:0">\u2715</button>
+    </div>`).join("") : `<div style="color:var(--textD);font-style:italic">None yet.</div>`;
+  const itemsHtml = S.player.items.length ? S.player.items.map(it=>`
+    <div style="color:var(--itemClr);display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span>\u2022 <strong>${escapeHtml(it.name)}</strong>${it.desc?` \u2014 ${escapeHtml(it.desc)}`:""}</span>
+      <button data-act="dropItem" data-kind="items" data-name="${attr(it.name)}" style="background:none;border:none;color:var(--delClr);font-size:13px;cursor:pointer;padding:2px 6px;outline:none;opacity:0.7;flex-shrink:0">\u2715</button>
+    </div>`).join("") : `<div style="color:var(--textD);font-style:italic">None yet.</div>`;
+  const toolsHtml = S.player.tools ? `<div><div class="panel-label">Tools of the Trade</div><div style="color:var(--toolClr)"><strong>${escapeHtml(S.player.tools.occupation)}</strong> \u2014 ${escapeHtml(S.player.tools.kit)}</div></div>` : "";
+  return `
+    <div><div class="panel-label">Quest</div>${questHtml}</div>
+    <div><div class="panel-label">Key Items (${S.player.keyItems.length}/${MAX_KEY})</div>${keyItemsHtml}</div>
+    <div><div class="panel-label">Items (${S.player.items.length}/${MAX_ITEMS})</div>${itemsHtml}</div>
+    ${toolsHtml}
+  `;
+}
+function updateInventoryUI(){
+  const el=document.getElementById("panelInventory");
+  if(!el) return;
+  el.className = S.panelOpen ? "panel" : "";
+  el.innerHTML = S.panelOpen ? renderInventoryPanelInner() : "";
+}
+
+function renderJournalPanelInner(){
+  const chars=[...S.player.characters].reverse();
+  const charsHtml = chars.length ? chars.map((c,i)=>{
+    const actualIdx = S.player.characters.length-1-i;
+    const selected = S.mergeSelection.includes(actualIdx);
+    const names=(c.names||[c.name]).filter(Boolean).join(" / ");
+    return `<div data-act="${S.mergeMode?"toggleMergeSelect":""}" data-idx="${actualIdx}" style="margin-bottom:7px;color:var(--charClr);cursor:${S.mergeMode?"pointer":"default"};padding:${S.mergeMode?"5px 7px":"0"};border-radius:4px;border:${S.mergeMode?`1px solid ${selected?"var(--acc)":"var(--bdrM)"}`:"none"};background:${selected?"var(--pABg)":"transparent"}">
+      <div><strong>${escapeHtml(names)}</strong> <span style="color:var(--textD);font-style:italic">(${escapeHtml(c.status)})</span>${c.present===false?`<span style="color:var(--textD);font-style:italic"> \u00b7 not currently present</span>`:""}</div>
+      ${c.role?`<div style="color:var(--textD);font-size:11px">${escapeHtml(c.role)}</div>`:""}
+      ${c.note?`<div style="color:var(--charClr);font-size:12px">${escapeHtml(c.note)}</div>`:""}
+    </div>`;
+  }).join("") : `<div style="color:var(--textD);font-style:italic">No one of note yet.</div>`;
+
+  const eventsHtml = S.memory.events.length ? [...S.memory.events].reverse().map(ev=>`<div style="color:var(--evClr);margin-bottom:3px">\u00b7 ${escapeHtml(ev.text)}</div>`).join("") : `<div style="color:var(--textD);font-style:italic">Nothing logged yet.</div>`;
+  const actsHtml = S.memory.acts.length ? `<div><div class="panel-label">Acts (since last Book)</div>${S.memory.acts.map(a=>`<div style="color:var(--actClr);margin-bottom:6px">${escapeHtml(a.text)}</div>`).join("")}</div>` : "";
+
+  return `
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+        <div class="panel-label" style="margin-bottom:0">Characters Met (${S.player.characters.length}/${MAX_CHARS})</div>
+        <div style="display:flex;gap:6px">
+          ${(S.mergeMode && S.mergeSelection.length===2) ? smBtnHtml("Confirm Merge","confirmMerge",{},false) : ""}
+          ${smBtnHtml(S.mergeMode?"Cancel":"Merge Characters","toggleMergeMode",{},S.player.characters.length<2)}
+        </div>
+      </div>
+      ${S.mergeMode?`<div style="color:var(--textD);font-size:10px;font-style:italic;margin-bottom:6px">Select two characters below to combine them into one entry.</div>`:""}
+      ${charsHtml}
+    </div>
+    <div><div class="panel-label">Events (since last Book) (${S.memory.events.length}/${EVENTS_LIMIT})</div>${eventsHtml}</div>
+    ${actsHtml}
+  `;
+}
+function updateJournalUI(){
+  const el=document.getElementById("panelJournal");
+  if(!el) return;
+  el.className = S.journalOpen ? "panel" : "";
+  el.innerHTML = S.journalOpen ? renderJournalPanelInner() : "";
+}
+
+function renderBooksPanelInner(){
+  const b=busy();
+  let inner = `<div style="display:flex;justify-content:center">${smBtnHtml("New Book \u2ef1","startBook",{},b||S.msgs.length===0)}</div>`;
+  if(S.books.length===0){
+    inner += `<div style="color:var(--textD);font-style:italic;text-align:center">No Books yet \u2014 close one above, or accept a suggestion after completing a quest.</div>`;
+  } else {
+    const tabs = S.books.map((bk,i)=>`<button data-act="setActiveBookTab" data-idx="${i}" style="padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;border:1px solid ${S.activeBookTab===i?"var(--bookClr)":"var(--bdrM)"};background:${S.activeBookTab===i?"var(--bookClr)18":"transparent"};color:${S.activeBookTab===i?"var(--bookClr)":"var(--textM)"};outline:none">Book ${i+1}</button>`).join("");
+    const active = S.books[S.activeBookTab];
+    let activeHtml="";
+    if(active){
+      const questsHtml = active.quests.length ? active.quests.map(q=>`<div style="color:var(--accHi);margin-bottom:4px"><strong>${escapeHtml(q.title)}</strong> <span style="color:var(--textD);font-style:italic">\u2014 ${escapeHtml(q.note)}</span></div>`).join("") : `<div style="color:var(--textD);font-style:italic">None.</div>`;
+      const eventsHtml = active.events.length ? `<div><div class="panel-label">Events</div>${active.events.map(ev=>`<div style="color:var(--evClr);margin-bottom:3px">\u00b7 ${escapeHtml(ev.text)}</div>`).join("")}</div>` : "";
+      const actsHtml = active.acts.length ? `<div><div class="panel-label">Acts</div>${active.acts.map(a=>`<div style="color:var(--actClr);margin-bottom:6px">${escapeHtml(a.text)}</div>`).join("")}</div>` : "";
+      activeHtml = `<div style="overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+        <div style="color:var(--bookClr);font-size:14px"><strong>${escapeHtml(active.title)}</strong></div>
+        <div style="color:var(--text);font-style:italic;line-height:1.5">${escapeHtml(active.summary)}</div>
+        <div><div class="panel-label">Quests in this Book</div>${questsHtml}</div>
+        ${eventsHtml}${actsHtml}
+      </div>`;
+    }
+    inner += `<div style="display:flex;gap:6px;flex-wrap:wrap">${tabs}</div>${activeHtml}`;
+  }
+  return inner;
+}
+function updateBooksUI(){
+  const el=document.getElementById("panelBooks");
+  if(!el) return;
+  if(S.booksOpen){
+    el.className="panel";
+    el.style.maxHeight="50vh";
+    el.style.overflow="hidden";
+    el.innerHTML = renderBooksPanelInner();
+  } else {
+    el.className="";
+    el.style.maxHeight="";
+    el.style.overflow="";
+    el.innerHTML="";
+  }
+}
+
+/* ── Game screen: narrative log (append-only, focus/scroll safe) ── */
+function renderOneMessageHtml(msg,i){
+  const b=busy();
+  if(msg.type==="meta") return `<div data-msg-idx="${i}" style="text-align:center;color:var(--textD);font-size:11px;letter-spacing:2px;text-transform:uppercase;opacity:0.8">\u25c8 &nbsp; ${escapeHtml(msg.text)} &nbsp; \u25c8</div>`;
+  if(msg.type==="bookmark") return `<div data-msg-idx="${i}" style="text-align:center;margin:4px 0">
+    <div style="border-top:1px solid var(--bookClr)55;margin-bottom:10px"></div>
+    <div style="color:var(--bookClr);font-size:11px;letter-spacing:2px;text-transform:uppercase">\u25c8 Book Closed: ${escapeHtml(msg.text)} \u25c8</div>
+    <div style="color:var(--textD);font-size:10px;letter-spacing:1px;margin-top:4px;font-style:italic">A new chapter begins</div>
+    <div style="border-top:1px solid var(--bookClr)55;margin-top:10px"></div>
+  </div>`;
+  if(msg.type==="error"){
+    const submitHint = (msg.retry && msg.retry.kind==="submit") ? `<div style="color:var(--textD);font-size:10px;font-style:italic">Still failing after a few tries? The plain "Continue \u27f3" button below uses a simpler request and may succeed even when Regenerate doesn't.</div>` : "";
+    return `<div data-msg-idx="${i}" style="border:1px solid ${OUTCOME_META.failure.color}55;border-radius:5px;padding:10px 14px;background:${OUTCOME_META.failure.color}0c;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <span>
+          <span style="color:${OUTCOME_META.failure.color};font-size:14px;font-weight:700">\u2717 The story stalled.</span>
+          <span style="color:var(--textD);font-size:11px;font-style:italic"> ${escapeHtml(msg.text)}</span>
+        </span>
+        <button data-act="regenerate" data-idx="${i}" ${b?"disabled":""} style="padding:5px 12px;background:transparent;border:1px solid ${OUTCOME_META.failure.color};border-radius:4px;color:${OUTCOME_META.failure.color};cursor:${b?"not-allowed":"pointer"};font-size:11px;outline:none;opacity:${b?0.5:1};white-space:nowrap">Regenerate \u27f3</button>
+      </div>
+      ${submitHint}
+    </div>`;
+  }
+  let out = "";
+  if(msg.outcomeMeta) out += `<div style="font-size:11px;color:${msg.outcomeMeta.color};letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;opacity:0.9">${msg.outcomeMeta.symbol} &nbsp; ${escapeHtml(msg.outcomeMeta.label)} \u2014 ${escapeHtml(msg.outcomeMeta.desc)}</div>`;
+  if(msg.type==="player"){
+    out += `<div style="color:var(--textP);font-style:italic;font-size:14px;line-height:1.6;padding-left:12px;border-left:2px solid var(--bdrM)"><span style="color:var(--textD);margin-right:8px">\u203a</span>${escapeHtml(msg.text)}</div>`;
+  } else {
+    out += `<div style="color:var(--text);font-size:15px;line-height:1.75">${renderTextHtml(msg.text)}</div>`;
+  }
+  if(msg.questTag){
+    const qcolor = msg.questTag.action==="fail" ? OUTCOME_META.failure.color : "var(--accHi)";
+    const qtext = msg.questTag.action==="set" ? `\u25c8 New Quest: ${escapeHtml(msg.questTag.title)}`
+      : msg.questTag.action==="update" ? `\u25c6 Quest Updated: ${escapeHtml(msg.questTag.title)}`
+      : msg.questTag.action==="fail" ? `\u2717 Quest Failed: ${escapeHtml(msg.questTag.title)}`
+      : `\u2726 Quest Complete: ${escapeHtml(msg.questTag.title||"")}`;
+    out += `<div style="font-size:11px;color:${qcolor};letter-spacing:1px;margin-top:8px;opacity:0.9">${qtext}</div>`;
+  }
+  if(msg.conditionsFullTag && msg.conditionsFullTag.length>0){
+    out += `<div style="font-size:11px;color:${OUTCOME_META.failure.color};letter-spacing:0.5px;margin-top:8px;opacity:0.9">\u26a0 Severe conditions at capacity \u2014 untracked: ${escapeHtml(msg.conditionsFullTag.join(", "))}</div>`;
+  }
+  if(msg.inventoryFullTag && (msg.inventoryFullTag.key.length>0||msg.inventoryFullTag.general.length>0)){
+    const full=[...msg.inventoryFullTag.key.map(n=>`${n} (key items full)`),...msg.inventoryFullTag.general.map(n=>`${n} (items full)`)].join(", ");
+    out += `<div style="font-size:11px;color:${OUTCOME_META.failure.color};letter-spacing:0.5px;margin-top:8px;opacity:0.9">\u26a0 Inventory full \u2014 couldn't carry: ${escapeHtml(full)}</div>`;
+  }
+  return `<div data-msg-idx="${i}">${out}</div>`;
+}
+function renderMsgListHtml(){
+  return S.msgs.map((m,i)=>renderOneMessageHtml(m,i)).join("");
+}
+/* Targeted DOM update: append a single new log entry instead of rebuilding
+   the whole narrative log \u2014 this is what keeps scroll position, text
+   selection, and (most importantly) input focus intact while a turn
+   resolves, per the "Preserve Text & Focus" refactor goal. */
+function appendMessage(msg){
+  const list=document.getElementById("msgList");
+  if(!list) return;
+  const idx=S.msgs.length-1;
+  list.insertAdjacentHTML("beforeend", renderOneMessageHtml(msg, idx));
+  scrollBottom();
+}
+/* Patches the last log entry in place (used after quest/inventory/condition
+   tags get attached to the narration that was just appended). */
+function refreshLastMessageNode(){
+  const idx=S.msgs.length-1;
+  if(idx<0) return;
+  const list=document.getElementById("msgList");
+  if(!list) return;
+  const html=renderOneMessageHtml(S.msgs[idx], idx);
+  const existing=list.querySelector(`[data-msg-idx="${idx}"]`);
+  if(existing) existing.outerHTML=html;
+  else list.insertAdjacentHTML("beforeend", html);
+}
+function removeMessageNode(idx){
+  const list=document.getElementById("msgList");
+  if(!list) return;
+  const existing=list.querySelector(`[data-msg-idx="${idx}"]`);
+  if(existing) existing.remove();
+}
+
+/* ── Game screen: transient footer (thinking indicator / continue-story
+   nudge / book suggestion / fate challenge) \u2014 lives below the log and is
+   cheap enough to just rebuild wholesale on every relevant state change. ── */
+function renderDynamicFooterInner(){
+  const b=busy();
+  let thinking="";
+  if(S.status==="narrating") thinking=`<div style="color:var(--think);font-style:italic;font-size:13px">The fates deliberate\u2026</div>`;
+  if(S.status==="booking") thinking=`<div style="color:var(--bookClr);font-style:italic;font-size:13px">Writing the chapter that just closed\u2026</div>`;
+
+  let continueLastBtn="";
+  if(!b && !S.challengeData && S.msgs.length>0 && S.msgs[S.msgs.length-1].type==="player"){
+    continueLastBtn = `<div style="text-align:center">
+      <button data-act="continueLastAction" style="padding:8px 20px;background:transparent;border:1px solid var(--acc);border-radius:4px;color:var(--accHi);cursor:pointer;font-size:13px;letter-spacing:0.5px;outline:none">Continue the story \u27f3</button>
+      <div style="color:var(--textD);font-size:10px;font-style:italic;margin-top:6px">If this keeps failing, the plain "Continue \u27f3" button below is a simpler alternative worth trying.</div>
+    </div>`;
+  }
+
+  let bookSuggestionHtml="";
+  if(S.bookSuggestion && !b){
+    bookSuggestionHtml = `<div style="text-align:center;border:1px solid var(--bookClr)55;border-radius:5px;padding:10px 14px;background:var(--bookClr)0c">
+      <div style="color:var(--bookClr);font-size:12px;margin-bottom:8px">\u25c8 This feels like a natural place to close a chapter.</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button data-act="startBook" style="padding:6px 14px;background:transparent;border:1px solid var(--bookClr);border-radius:4px;color:var(--bookClr);cursor:pointer;font-size:12px;outline:none">Start a Book</button>
+        <button data-act="dismissBookSuggestion" style="padding:6px 14px;background:transparent;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);cursor:pointer;font-size:12px;outline:none">Not now</button>
+      </div>
+    </div>`;
+  }
+
+  let challengeHtml="";
+  if(S.challengeData){
+    const cd=S.challengeData;
+    let modLine="";
+    if(cd.modifier && cd.modifier!=="neutral" && cd.reason){
+      modLine = `<div style="text-align:center;font-size:11px;margin-bottom:10px;color:${cd.modifier==="favorable"?OUTCOME_META.success.color:OUTCOME_META.failure.color};letter-spacing:0.5px">${cd.modifier==="favorable"?"\u25c6 Favorable":"\u25c7 Unfavorable"} \u2014 ${escapeHtml(cd.reason)}</div>`;
+    }
+    const btns = cd.buttons.map((btnType,idx)=>{
+      const isSelected = cd.revealed && cd.revealed.idx===idx;
+      const isRevealed = !!cd.revealed;
+      const meta=BTN_META[btnType];
+      const mc = S.dark?meta.c_dark:meta.c_light;
+      const dimmed = isRevealed && !isSelected;
+      return `<button data-act="choiceButton" data-idx="${idx}" ${isRevealed?"disabled":""} style="flex:1;padding:16px 6px;background:${isSelected?mc+"18":"var(--fbBg)"};border:1px solid ${isSelected?mc:isRevealed?"var(--bdr)":"var(--fbBdr)"};border-radius:5px;color:${dimmed?"var(--fbDim)":isSelected?mc:"var(--fbClr)"};cursor:${isRevealed?"default":"pointer"};font-size:14px;transition:all .35s;letter-spacing:1px;outline:none">${isRevealed?meta.label:"\u269c"}</button>`;
+    }).join("");
+    let revealedLine="";
+    if(cd.revealed){
+      const om=OUTCOME_META[cd.revealed.outcome];
+      revealedLine = `<div style="margin-top:8px;font-size:12px;color:${om.color};letter-spacing:1px">${om.symbol} &nbsp; ${escapeHtml(BTN_META[cd.revealed.btnType].label)}${cd.revealed.btnType==="fate"?` \u2192 ${escapeHtml(om.label)}`:""}</div>`;
+    }
+    let deliberating="";
+    if(S.status==="narrating" && cd.revealed) deliberating=`<div style="color:var(--think);font-style:italic;font-size:13px;margin-top:10px">The world reshapes\u2026</div>`;
+    challengeHtml = `<div>
+      <div style="color:var(--textM);font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">\u25c8 &nbsp; A moment of fate \u2014 choose your path &nbsp; \u25c8</div>
+      ${modLine}
+      <div style="display:flex;gap:10px">${btns}</div>
+      ${revealedLine}
+      ${deliberating}
+    </div>`;
+  }
+
+  return `${thinking}${continueLastBtn}${bookSuggestionHtml}${challengeHtml}`;
+}
+function updateDynamicFooter(){
+  const el=document.getElementById("dynamicFooter");
+  if(!el) return;
+  el.innerHTML = renderDynamicFooterInner();
+  scrollBottom();
+}
+
+/* ── Game screen: suggestion box ── */
+function renderSuggBoxInner(){
+  if(!S.suggOpen) return "";
+  const b=busy();
+  let suggContent;
+  if(S.suggBusy) suggContent=`<div style="color:var(--think);font-style:italic;font-size:12px">Weighing possibilities\u2026</div>`;
+  else if(S.suggestions) suggContent=S.suggestions.map((s,i)=>`<button data-act="pickSuggestion" data-idx="${i}" ${b?"disabled":""} style="text-align:left;padding:8px 12px;background:transparent;border:1px solid var(--bdrM);border-radius:4px;color:var(--text);cursor:${b?"not-allowed":"pointer"};font-size:13px;outline:none">${escapeHtml(s)}</button>`).join("");
+  else suggContent=`<div style="color:${OUTCOME_META.failure.color};font-size:12px;font-style:italic">Couldn't come up with anything \u2014 try Reroll.</div>`;
+  return `<div style="padding:10px 14px;border-top:1px solid var(--bdr);background:var(--bgCard);flex-shrink:0;display:flex;flex-direction:column;gap:8px">
+    <div style="font-size:10px;color:var(--textD);letter-spacing:1.5px;text-transform:uppercase">Need an idea?</div>
+    ${suggContent}
+    <div style="display:flex;gap:8px;margin-top:2px">
+      ${smBtnHtml("Reroll \u27f3","reroll",{},b||S.suggBusy)}
+      ${smBtnHtml("Cancel","cancelSuggestions",{},false)}
+    </div>
+  </div>`;
+}
+function updateSuggBox(){
+  const el=document.getElementById("suggBoxContainer");
+  if(el) el.innerHTML = renderSuggBoxInner();
+}
+
+/* ── Game screen: input bar ── */
+function renderInputBarHtml(){
+  const b=busy();
+  return `<div style="padding:10px 14px;border-top:1px solid var(--bdr);background:var(--bgI);display:flex;gap:8px;align-items:flex-end;flex-shrink:0">
+    <textarea id="mainInput" placeholder="${b?"Awaiting fate\u2026":"What do you do? (Shift+Enter for a new line)"}" ${b?"disabled":""} rows="1" style="flex:1;resize:none;max-height:120px;min-height:38px;line-height:1.4;overflow-y:auto;box-sizing:border-box">${escapeHtml(S.input)}</textarea>
+    <button id="actBtn" data-act="submitAction" ${(b||!S.input.trim())?"disabled":""} style="padding:9px 16px;background:transparent;border:1px solid ${(b||!S.input.trim())?"var(--bdrM)":"var(--acc)"};border-radius:4px;color:${(b||!S.input.trim())?"var(--accLo)":"var(--acc)"};cursor:${(b||!S.input.trim())?"not-allowed":"pointer"};font-size:13px;flex-shrink:0;outline:none;height:38px">Act</button>
+    <button id="suggestBtn" data-act="suggestClick" ${(b||S.suggBusy)?"disabled":""} style="padding:9px 12px;background:transparent;border:1px solid ${(b||S.suggBusy)?"var(--bdrM)":"var(--bdrC)"};border-radius:4px;color:${(b||S.suggBusy)?"var(--accLo)":"var(--textM)"};cursor:${(b||S.suggBusy)?"not-allowed":"pointer"};font-size:12px;flex-shrink:0;outline:none;height:38px;white-space:nowrap">Suggest \ud83d\udca1</button>
+    <button id="continueBtn" data-act="continueAction" ${b?"disabled":""} style="padding:9px 14px;background:transparent;border:1px solid ${b?"var(--bdrM)":"var(--bdrC)"};border-radius:4px;color:${b?"var(--accLo)":"var(--textM)"};cursor:${b?"not-allowed":"pointer"};font-size:12px;flex-shrink:0;outline:none;height:38px;white-space:nowrap">Continue \u27f3</button>
+  </div>`;
+}
+/* Targeted DOM update: toggle disabled/placeholder state on the existing
+   input controls. Deliberately never touches the textarea's `value` \u2014
+   that's the crux of the "Preserve Text & Focus" fix, since replacing the
+   node (or its value) mid-turn is what used to blow away in-progress
+   typing, text selection, and keyboard focus. */
+function updateInputState(){
+  const b=busy();
+  const ta=document.getElementById("mainInput");
+  if(ta){
+    ta.disabled=b;
+    ta.placeholder = b?"Awaiting fate\u2026":"What do you do? (Shift+Enter for a new line)";
+  }
+  const actBtn=document.getElementById("actBtn");
+  if(actBtn){
+    const disabled = b || !S.input.trim();
+    actBtn.disabled=disabled;
+    actBtn.style.borderColor = disabled?"var(--bdrM)":"var(--acc)";
+    actBtn.style.color = disabled?"var(--accLo)":"var(--acc)";
+    actBtn.style.cursor = disabled?"not-allowed":"pointer";
+  }
+  const suggestBtn=document.getElementById("suggestBtn");
+  if(suggestBtn){
+    const disabled=b||S.suggBusy;
+    suggestBtn.disabled=disabled;
+    suggestBtn.style.borderColor=disabled?"var(--bdrM)":"var(--bdrC)";
+    suggestBtn.style.color=disabled?"var(--accLo)":"var(--textM)";
+    suggestBtn.style.cursor=disabled?"not-allowed":"pointer";
+  }
+  const continueBtn=document.getElementById("continueBtn");
+  if(continueBtn){
+    continueBtn.disabled=b;
+    continueBtn.style.borderColor=b?"var(--bdrM)":"var(--bdrC)";
+    continueBtn.style.color=b?"var(--accLo)":"var(--textM)";
+    continueBtn.style.cursor=b?"not-allowed":"pointer";
+  }
+}
+
+/* ── Game screen: "New Book" modal ── */
+function renderBookModalInner(){
+  if(!S.bookModal) return "";
+  const bm=S.bookModal;
+  let tabContent;
+  if(S.modalTab==="book"){
+    tabContent = `<div style="color:var(--accHi);font-size:17px"><strong>${escapeHtml(bm.title)}</strong></div>
+      <div style="color:var(--text);font-size:13px;line-height:1.6;font-style:italic">${escapeHtml(bm.summary)}</div>`;
+  } else {
+    let evoHtml;
+    if(bm.characterEvolution){
+      const choices=["accept","edit","decline"].map(choice=>`<button data-act="setBookCharChoice" data-choice="${choice}" style="padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;border:1px solid ${bm.charChoice===choice?"var(--pABdr)":"var(--bdrM)"};background:${bm.charChoice===choice?"var(--pABg)":"transparent"};color:${bm.charChoice===choice?"var(--pAClr)":"var(--textM)"};outline:none;text-transform:capitalize">${choice}</button>`).join("");
+      const finalResult = bm.charChoice==="decline" ? (S.player.desc.trim()||"(none given)") : `${S.player.desc.trim()} ${(bm.charText||"").trim()}`.trim();
+      evoHtml = `<div>
+          <div class="panel-label">Proposed Addition</div>
+          <div style="color:var(--bookClr);font-size:12px;line-height:1.5">${escapeHtml(bm.characterEvolution)}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${choices}</div>
+        ${bm.charChoice!=="decline" ? `<textarea id="bookCharTextarea" rows="2" style="width:100%;resize:vertical;box-sizing:border-box;font-size:12px">${escapeHtml(bm.charText)}</textarea>` : ""}
+        <div>
+          <div class="panel-label">Final Combined Result</div>
+          <div id="bookFinalPreview" style="color:var(--accHi);font-size:12px;line-height:1.5;font-style:italic;border:1px solid var(--bdr);border-radius:4px;padding:8px 10px">${escapeHtml(finalResult)}</div>
+        </div>`;
+    } else {
+      evoHtml = `<div style="color:var(--textD);font-style:italic;font-size:12px">Nothing significant enough to propose this time \u2014 your description will stay exactly as written.</div>`;
+    }
+    tabContent = `<div>
+        <div class="panel-label">Current Description</div>
+        <div style="color:var(--text);font-size:12px;line-height:1.5;font-style:italic">${escapeHtml(S.player.desc.trim()||"(none given)")}</div>
+      </div>${evoHtml}`;
+    tabContent = `<div style="display:flex;flex-direction:column;gap:12px">${tabContent}</div>`;
+  }
+  const canConfirm = S.tabsViewed.book && S.tabsViewed.personality;
+  return `<div class="modal-overlay"><div class="modal-box">
+    <div style="color:var(--bookClr);font-size:11px;letter-spacing:2px;text-transform:uppercase">\u25c8 New Book \u25c8</div>
+    <div style="display:flex;gap:6px">
+      <button data-act="switchModalTab" data-tab="book" style="padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;border:1px solid ${S.modalTab==="book"?"var(--bookClr)":"var(--bdrM)"};background:${S.modalTab==="book"?"var(--bookClr)18":"transparent"};color:${S.modalTab==="book"?"var(--bookClr)":"var(--textM)"};outline:none">Book</button>
+      <button data-act="switchModalTab" data-tab="personality" style="padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;border:1px solid ${S.modalTab==="personality"?"var(--bookClr)":"var(--bdrM)"};background:${S.modalTab==="personality"?"var(--bookClr)18":"transparent"};color:${S.modalTab==="personality"?"var(--bookClr)":"var(--textM)"};outline:none">Personality${!S.tabsViewed.personality?" \u2022":""}</button>
+    </div>
+    ${tabContent}
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+      <button data-act="cancelBookModal" style="padding:7px 16px;background:transparent;border:1px solid var(--bdrC);border-radius:4px;color:var(--textM);cursor:pointer;font-size:13px;outline:none">Cancel</button>
+      <button data-act="confirmBook" ${canConfirm?"":"disabled"} style="padding:7px 20px;background:transparent;border:1px solid ${canConfirm?"var(--bookClr)":"var(--bdrM)"};border-radius:4px;color:${canConfirm?"var(--bookClr)":"var(--accLo)"};cursor:${canConfirm?"pointer":"not-allowed"};font-size:13px;outline:none">${canConfirm?"Finish Book":"Check both tabs to continue"}</button>
+    </div>
+  </div></div>`;
+}
+function updateBookModal(){
+  const el=document.getElementById("bookModalContainer");
+  if(el) el.innerHTML = renderBookModalInner();
+}
+
+/* ── Game screen: mount (full, static shell) + refresh (targeted, safe) ── */
+function mountGameScreen(){
+  const b=busy();
+  const app=document.getElementById("app");
+  app.innerHTML = `
+    ${headerBarHtml(`
+      <button id="hdrSavesBtn" class="link-btn" data-act="goScreen" data-screen="saves" ${b?"disabled":""} style="color:${b?"var(--accLo)":"var(--newBtn)"};font-size:11px">Saves</button>
+      <button id="hdrNewBtn" class="link-btn" data-act="goScreen" data-screen="setup" ${b?"disabled":""} style="color:${b?"var(--accLo)":"var(--newBtn)"};font-size:11px">New</button>
+    `)}
+    <div class="sbar" id="sbarContainer"></div>
+    <div id="panelStatus"></div>
+    <div id="panelInventory"></div>
+    <div id="panelJournal"></div>
+    <div id="panelBooks"></div>
+    <div id="msgScroll" style="flex:1;overflow-y:auto;padding:20px 22px 10px;display:flex;flex-direction:column;gap:18px">
+      <div id="msgList" style="display:flex;flex-direction:column;gap:18px"></div>
+      <div id="dynamicFooter" style="display:flex;flex-direction:column;gap:18px"></div>
+    </div>
+    <div id="suggBoxContainer"></div>
+    <div id="inputBarContainer"></div>
+    <div id="bookModalContainer"></div>
+    <div id="settingsModalContainer"></div>
+  `;
+  document.getElementById("msgList").innerHTML = renderMsgListHtml();
+  document.getElementById("inputBarContainer").innerHTML = renderInputBarHtml();
+  updateSaveBar();
+  updateStatusUI();
+  updateInventoryUI();
+  updateJournalUI();
+  updateBooksUI();
+  updateDynamicFooter();
+  updateSuggBox();
+  updateBookModal();
+  updateSettingsModal();
+  scrollBottom();
+}
+/* Safety-net refresh used for any render() call while already mounted on
+   the game screen: refreshes every region EXCEPT the message log and the
+   input textarea's live value, so it can never wipe an in-progress action
+   or scroll position no matter which handler triggered it. */
+function refreshGameScreen(){
+  updateHeaderButtons();
+  updateSaveBar();
+  updateStatusUI();
+  updateInventoryUI();
+  updateJournalUI();
+  updateBooksUI();
+  updateDynamicFooter();
+  updateSuggBox();
+  updateInputState();
+  updateBookModal();
+  updateSettingsModal();
+}
+
+/* ============================== EVENT DELEGATION ============================== */
+
+function resizeTextarea(el){
+  el.style.height="auto";
+  el.style.height=Math.min(el.scrollHeight,120)+"px";
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+  const app=document.getElementById("app");
+
+  app.addEventListener("click", function(e){
+    const el = e.target.closest("[data-act]");
+    if(!el) return;
+    const act = el.dataset.act;
+    if(!act) return;
+    switch(act){
+      case "toggleTheme": {
+        S.dark = !S.dark;
+        window.storage.set("theme_pref", S.dark?"dark":"light").catch(()=>{});
+        if(S.screen==="game" && gameMounted){
+          // Targeted: colors are CSS variables and update automatically;
+          // only the couple of theme-baked bits (button label, challenge
+          // button colors) need an explicit refresh.
+          applyThemeVars();
+          const btn=document.getElementById("themeToggleBtn");
+          if(btn) btn.textContent = S.dark?"\u2600 Light":"\u263e Dark";
+          updateDynamicFooter();
+        } else {
+          render();
+        }
+        persistSession();
+        break;
+      }
+      case "openSettings": openSettingsModal(); break;
+      case "closeSettings": {
+        if(S.apiTargets.length===0) break; // can't close out of the forced "add one" state
+        setState(s=>{ s.settingsOpen=false; }, updateSettingsModal);
+        break;
+      }
+      case "toggleApiKeyVisibility": {
+        S.apiKeyVisible = !S.apiKeyVisible;
+        const input=document.getElementById("targetKeyInput");
+        if(input) input.type = S.apiKeyVisible ? "text" : "password";
+        const btn=el;
+        if(btn) btn.textContent = S.apiKeyVisible ? "Hide" : "Show";
+        break;
+      }
+      case "newTargetForm": openNewTargetForm(); break;
+      case "editTarget": openEditTargetForm(el.dataset.id); break;
+      case "cancelTargetForm": {
+        setState(s=>{ s.settingsMode="list"; }, updateSettingsModal);
+        break;
+      }
+      case "saveTargetForm": {
+        const nameEl=document.getElementById("targetNameInput");
+        const urlEl=document.getElementById("targetUrlInput");
+        const providerEl=document.getElementById("targetProviderInput");
+        const modelEl=document.getElementById("targetModelInput");
+        const keyEl=document.getElementById("targetKeyInput");
+        const name=nameEl?nameEl.value:"";
+        const url=(urlEl?urlEl.value:"").trim() || API_CONFIG.defaultUrl;
+        const provider=providerEl?providerEl.value:"";
+        const model=modelEl?modelEl.value:"";
+        const key=keyEl?keyEl.value:"";
+        if(!provider) break; // Service Type is required (button is disabled for this too, but don't trust that alone)
+        const editingId = el.dataset.editingId || null;
+        setState(s=>{
+          const id = addOrUpdateTarget(editingId, name, url, provider, model, key);
+          if(!s.activeTargetId) s.activeTargetId = id; // first target ever added becomes active automatically
+          s.settingsMode="list";
+          s.editingTargetId=null;
+        }, ()=>{
+          setStoredApiTargets(S.apiTargets);
+          setStoredActiveTargetId(S.activeTargetId||"");
+          render(); // target list/active id changed \u2014 refresh setup-screen pills + Begin gating too, not just the modal
+        });
+        break;
+      }
+      case "selectTarget": {
+        setState(s=>{ selectTarget(el.dataset.id); }, render);
+        break;
+      }
+      case "deleteTarget": {
+        const deletedId = el.dataset.id;
+        setState(s=>{ deleteTarget(deletedId); }, ()=>{
+          if(S.settingsMode==="form" && S.editingTargetId===deletedId){ S.settingsMode="list"; S.editingTargetId=null; }
+          render();
+        });
+        break;
+      }
+      case "goScreen": {
+        const target = el.dataset.screen;
+        if(target==="saves"||target==="setup"){
+          if(busy()) return;
+        }
+        S.screen = target;
+        render();
+        if(target==="game") scrollBottom();
+        break;
+      }
+      case "setMood": S.mood = el.dataset.key; render(); break;
+      case "setSetting": S.setting = el.dataset.key; render(); break;
+      case "setEngine": S.engine = el.dataset.key; render(); break;
+      case "setGender": S.player.gender = el.dataset.key; render(); break;
+      case "beginTale": if(S.mood && S.setting && activeTarget()) startGame(); break;
+      case "randomize": handleRandom(); break;
+      case "selectTargetSetup": setState(s=>{ selectTarget(el.dataset.id); }, render); break;
+      case "toggleStatus": setState(s=>{ s.statusOpen=!s.statusOpen; }, ()=>{ updateStatusUI(); updateSaveBar(); }); break;
+      case "togglePanel": setState(s=>{ s.panelOpen=!s.panelOpen; }, ()=>{ updateInventoryUI(); updateSaveBar(); }); break;
+      case "toggleJournal": setState(s=>{ s.journalOpen=!s.journalOpen; }, ()=>{ updateJournalUI(); updateSaveBar(); }); break;
+      case "toggleBooks": setState(s=>{ s.booksOpen=!s.booksOpen; s.activeBookTab=Math.max(0,s.books.length-1); }, ()=>{ updateBooksUI(); updateSaveBar(); }); break;
+      case "saveCurrent": handleSaveCurrent(el.dataset.asnew==="1"); break;
+      case "loadSave": if(!busy() && S.renamingId!==el.dataset.id) handleLoadSave(el.dataset.id); break;
+      case "deleteSave": handleDeleteSave(el.dataset.id, e); break;
+      case "renameStart": e.stopPropagation(); S.renamingId=el.dataset.id; S.renameText=el.dataset.name; render(); break;
+      case "renameSave": {
+        e.stopPropagation();
+        const inputEl=document.getElementById("renameInput");
+        handleRenameSave(el.dataset.id, inputEl?inputEl.value:S.renameText);
+        break;
+      }
+      case "renameCancel": e.stopPropagation(); S.renamingId=null; render(); break;
+      case "exportSave": handleExportSave(el.dataset.id, e); break;
+      case "toggleAutosave": handleToggleAutosave(); break;
+      case "dropItem": handleDropItem(el.dataset.kind, el.dataset.name); break;
+      case "toggleMergeMode": setState(s=>{ s.mergeMode=!s.mergeMode; s.mergeSelection=[]; }, updateJournalUI); break;
+      case "toggleMergeSelect": toggleMergeSelect(parseInt(el.dataset.idx,10)); break;
+      case "confirmMerge": handleMergeCharacters(); break;
+      case "startBook": handleStartBook(); break;
+      case "switchModalTab": switchModalTab(el.dataset.tab); break;
+      case "setBookCharChoice": setBookCharChoice(el.dataset.choice); break;
+      case "confirmBook": handleConfirmBook(); break;
+      case "cancelBookModal": handleCancelBookModal(); break;
+      case "regenerate": handleRegenerate(parseInt(el.dataset.idx,10), S.msgs[parseInt(el.dataset.idx,10)].retry); break;
+      case "continueLastAction": {
+        const lastMsg = S.msgs[S.msgs.length-1];
+        runStep(()=>narratorTurnCore(lastMsg.text),"submit",{action:lastMsg.text});
+        break;
+      }
+      case "dismissBookSuggestion": setState(s=>{ s.bookSuggestion=false; }, updateDynamicFooter); break;
+      case "choiceButton": handleChoice(parseInt(el.dataset.idx,10)); break;
+      case "suggestClick": handleSuggestClick(); break;
+      case "reroll": handleReroll(); break;
+      case "cancelSuggestions": handleCancelSuggestions(); break;
+      case "pickSuggestion": handlePickSuggestion(S.suggestions[parseInt(el.dataset.idx,10)]); break;
+      case "submitAction": handleSubmit(); break;
+      case "continueAction": handleContinue(); break;
+      case "setActiveBookTab": setState(s=>{ s.activeBookTab=parseInt(el.dataset.idx,10); }, updateBooksUI); break;
+    }
+  });
+
+  app.addEventListener("input", function(e){
+    if(e.target.id==="mainInput"){
+      S.input = e.target.value;
+      resizeTextarea(e.target);
+      updateInputState(); // cheap: only toggles the Act button's disabled state
+    } else if(e.target.id==="playerDescInput"){
+      S.player.desc = e.target.value;
+    } else if(e.target.id==="renameInput"){
+      S.renameText = e.target.value;
+    } else if(e.target.id==="bookCharTextarea"){
+      setBookCharText(e.target.value);
+    } else if(e.target.id==="targetNameInput"){
+      S.targetForm.name = e.target.value;
+    } else if(e.target.id==="targetUrlInput"){
+      S.targetForm.url = e.target.value;
+    } else if(e.target.id==="targetKeyInput"){
+      S.targetForm.key = e.target.value;
+    } else if(e.target.id==="targetModelInput"){
+      S.targetForm.model = e.target.value;
+    }
+  });
+
+  app.addEventListener("keydown", function(e){
+    if(e.target.id==="mainInput"){
+      if(e.key==="Enter" && !e.shiftKey){
+        e.preventDefault();
+        handleSubmit();
+      }
+    } else if(e.target.id==="renameInput"){
+      if(e.key==="Enter"){ handleRenameSave(S.renamingId, e.target.value); }
+      if(e.key==="Escape"){ S.renamingId=null; render(); }
+    }
+  });
+
+  app.addEventListener("change", function(e){
+    if(e.target.id==="importFileInput"){
+      handleImportFile(e);
+    } else if(e.target.id==="targetProviderInput"){
+      // Targeted: just update state + the model placeholder + the Save
+      // button's enabled state, without rebuilding the whole form (which
+      // would cost focus on whatever field the user is about to fill in).
+      S.targetForm.provider = e.target.value;
+      const providerDef = PROVIDERS[e.target.value];
+      const modelEl=document.getElementById("targetModelInput");
+      if(modelEl) modelEl.placeholder = providerDef && providerDef.defaultModel ? `e.g. ${providerDef.defaultModel}` : (providerDef ? "required for this service" : "choose a service type first");
+      const saveBtn=document.getElementById("saveTargetFormBtn");
+      if(saveBtn){
+        const enabled = !!providerDef;
+        saveBtn.disabled = !enabled;
+        saveBtn.style.borderColor = enabled?"var(--acc)":"var(--bdrM)";
+        saveBtn.style.color = enabled?"var(--accHi)":"var(--accLo)";
+        saveBtn.style.cursor = enabled?"pointer":"not-allowed";
+      }
+    }
+  });
+
+  // "focusout" (unlike "blur") bubbles, so it works with event delegation.
+  app.addEventListener("focusout", function(e){
+    if(e.target.id==="targetUrlInput") handleTargetUrlBlur();
+  });
+
+  /* ── Startup ── */
+  (async function init(){
+    applyThemeVars();
+    render();
+    refreshSaveList();
+    refreshAutosaveMeta().then(render);
+    try{
+      const r = await window.storage.get("theme_pref");
+      if(r && r.value==="light") S.dark=false;
+      else if(r && r.value==="dark") S.dark=true;
+    }catch(e){}
+    try{
+      const r2 = await window.storage.get("autosave_pref");
+      if(r2 && r2.value==="off") S.autosaveEnabled=false;
+      else if(r2 && r2.value==="on") S.autosaveEnabled=true;
+    }catch(e){}
+    render();
+  })();
+});
+</script>
+</body>
+</html>
+</body>
+</html>
