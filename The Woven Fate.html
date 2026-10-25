@@ -103,30 +103,43 @@ const GENDERS = [
   {key:"other",     label:"Other"},
   {key:"undefined", label:"Undefined"},
 ];
+const SETTING_SYSTEM = {
+  contemporary: "a grounded modern-day setting with current-day technology, urban realism, and recognizable societal structures",
+  urban_fantasy: "a modern world where hidden magic, mythical creatures, and ancient occult forces operate just beneath the surface of everyday life",
+  high_fantasy: "a realm of ancient magic, mythic races, blade-and-sorcery combat, kingdoms, and sprawling mythic scale",
+  folklore: "a superstitious, myth-haunted landscape where ancient spirits, local legends, and rural traditions hold real power",
+  steampunk: "an alternate Victorian era driven by brass clockwork, steam machinery, airships, and early industrial grit",
+  science_fiction: "a future world defined by advanced technology, cybernetics, space travel, or speculative scientific realities",
+  western: "a rugged frontier landscape of lawless towns, dusty trails, moral grit, and the clash of survival",
+  historical: "a rigidly structured past era defined by period-accurate technology, social hierarchies, and historical realism",
+  school: "an academic institution or academy setting shaped by institutional politics, student dynamics, structured routines, and hidden subcultures",
+};
 const MOOD_SYSTEM = {
-  tragic:     "unrelenting darkness and tragedy \u2014 no redemption, no levity, consequences are permanent and brutal",
-  dark:       "grim seriousness with moral ambiguity and weighty consequences",
+  tragic:     "unrelenting tragedy and profound loss: no easy redemption, where emotional grief, permanent consequences, and dramatic sacrifices carry heavy weight",
+  dark:       "grim seriousness with moral ambiguity, heavy consequences, and visceral conflict",
   neutral:    "a balanced mix of tension and relief, light and shadow in equal measure",
   whimsical:  "warm and playful with light-hearted humour woven through the adventure",
-  comedic:    "irreverent and funny \u2014 lean into absurdity, wit and self-aware humour",
-  romantic:   "charged with passion, longing, and emotional connection \u2014 relationships and chemistry drive the stakes",
-  mysterious: "thick with secrets, slow reveals, and atmospheric unease \u2014 intrigue over outright dread",
-  heroic:     "grand and triumphant \u2014 noble purpose, larger-than-life stakes, courage rewarded",
+  comedic:    "irreverent and funny: lean into absurdity, wit and self-aware humour",
+  romantic:   "charged with passion, longing, and emotional connection: relationships and chemistry drive the stakes",
+  mysterious: "thick with secrets, slow reveals, and atmospheric unease: intrigue over outright dread",
+  heroic:     "grand and triumphant: noble purpose, larger-than-life stakes, courage rewarded",
 };
+
 const ENGINE_SYSTEM = {
   story_driven: "let the plot shape emerge naturally from the setting and mood, without favouring any specific genre conventions",
-  detective:    "an investigation-driven mystery \u2014 clues, suspects, deduction, and a truth being slowly uncovered",
-  crime:        "a criminal underworld story \u2014 heists, double-crosses, loyalty and betrayal among those outside the law",
-  spy:          "espionage and tradecraft \u2014 hidden agendas, covert operations, and danger behind a respectable facade",
-  action:       "escalating physical confrontation and competence under pressure \u2014 relentless momentum, set-piece conflicts",
-  adventure:    "exploration-driven pulp adventure \u2014 ruins, puzzles, danger as obstacle rather than confrontation",
-  superhero:    "heroic duty and power with responsibility \u2014 colorful antagonists, dramatic stakes, found-family or team dynamics where relevant",
+  detective:    "an investigation-driven mystery: clues, suspects, deduction, and a truth being slowly uncovered",
+  crime:        "a criminal underworld story: heists, planning and executing fictional robberies or illegal schemes, double-crosses, and loyalty among outlaws (framed purely as dramatic fiction)",
+  spy:          "espionage and tradecraft: hidden agendas, covert operations, and danger behind a respectable facade",
+  action:       "escalating physical confrontation and competence under pressure: relentless momentum, high-octane set-pieces",
+  adventure:    "exploration-driven pulp adventure: ruins, puzzles, danger as obstacle rather than confrontation",
+  superhero:    "heroic duty and power with responsibility: colorful antagonists, dramatic stakes, and larger-than-life clashes",
   gothic_horror:"dread, decay, and human-scale tragedy in a crumbling, oppressive atmosphere",
-  cosmic_horror:"incomprehensible scale and existential insignificance \u2014 sanity-fraying revelations",
+  cosmic_horror:"incomprehensible scale and existential insignificance: sanity-fraying revelations",
   monster_horror:"a hunted, cornered survival dynamic against a tangible, lethal threat",
   swashbuckling:"daring derring-do, banter, duels, and bold escapades with a loyal crew or companions",
-  political:    "courts, factions, and alliances \u2014 danger through words and shifting power rather than violence; betrayal and leverage are the weapons, and this can encompass the politics and consequences of larger conflicts and wars",
+  political:    "courts, factions, and alliances: danger through words, leverage, and shifting power dynamics, including the consequences of war and rebellion",
 };
+
 const MAX_KEY=3, MAX_ITEMS=5, MAX_CHARS=12, MAX_COND=3;
 const HISTORY_LIMIT=20, HISTORY_KEEP=6, EVENTS_LIMIT=20, EVENTS_COLLAPSE=10;
 const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
@@ -449,8 +462,7 @@ const DEFAULT_MEMORY = {events:[],acts:[]};
 
 function buildSystem(mood,setting,engine,playerInfo,isJudge){
   isJudge = isJudge||false;
-  const sObj = SETTINGS.find(s=>s.key===setting);
-  const sl = sObj ? sObj.label : setting;
+  const sl = SETTING_SYSTEM[setting] || setting;
   const md = MOOD_SYSTEM[mood] || "balanced";
   const ed = ENGINE_SYSTEM[engine] || ENGINE_SYSTEM.story_driven;
   const pBits=[];
