@@ -1,0 +1,42 @@
+The Woven Fate License
+
+Copyright (c) 2026 Morten Johansen
+
+Original project: https://github.com/WingedKagouti/The-Woven-Fate
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of these files (the "Software"), to use, copy, modify, merge, publish,
+distribute, sublicense, and create derivative works from the Software, in any
+way they wish, subject to the following conditions:
+
+1. License and attribution. Every copy of the Software, and every modified
+   version or derivative work, must include a copy of this license text,
+   including the link to the original project above, whenever it is
+   distributed or otherwise made available to others. The text may be
+   provided in any file or location, under any name, including inside a
+   combined notices file or embedded within the distributed files themselves
+   (for example, in a comment at the top of an HTML file or on an "about"
+   page), as long as recipients can reasonably find it.
+
+2. No charge for unmodified files. You may not sell, or charge any fee for,
+   any file of the Software in unmodified form, whether on its own or as part
+   of a larger work, bundle, product, or service that is sold or otherwise
+   charged for. "Unmodified" means a file exactly as originally published by
+   the author, with no changes to its contents. Modifying a file lifts this
+   restriction for that file only. A work that contains no unmodified files
+   of the Software may be sold or distributed commercially, provided it
+   complies with condition 1.
+
+3. Other licenses. A modified version or derivative work may carry its own
+   license for the changes and additions made by its author, and may be
+   distributed alongside other licensed material. That license does not
+   replace this one for the portions of the Software that remain in the work,
+   which stay subject to this license.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHOR(S) OR COPYRIGHT HOLDER(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
