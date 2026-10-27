@@ -146,7 +146,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.6";
+const APP_VERSION="v4.8";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -471,9 +471,10 @@ function buildSystem(mood,setting,engine,playerInfo,isJudge){
   const pLine = pBits.length ? `\n\nThe player character (always addressed as "you") has the following fixed traits \u2014 keep these consistent in every scene: ${pBits.join("; ")}.` : "";
   const memLine = (playerInfo && playerInfo.memoryContext) ? `\n\nStory so far (for continuity \u2014 do not restate verbatim, just stay consistent with it):\n${playerInfo.memoryContext}` : "";
   const itemsLine = (playerInfo && playerInfo.itemsContext) ? `\n\nThe player currently carries:\n${playerInfo.itemsContext}` : "";
+  const loreLine = (playerInfo && playerInfo.loreContext) ? `\n\nWorld lore (established canon \u2014 stay consistent with it, use it naturally when relevant, never quote it or mention a lorebook):\n${playerInfo.loreContext}` : "";
   const condLine = (playerInfo && playerInfo.conditionsContext) ? `\n\n${playerInfo.conditionsContext}` : "";
-  if(isJudge) return `You are a game master running a ${sl} setting with this plot engine: ${ed}. Analyse player actions. Respond ONLY with raw JSON \u2014 no markdown, no explanation.${pLine}${memLine}${itemsLine}${condLine}`;
-  return `You are the game master of a ${sl} setting RPG. Plot engine: ${ed}. Tone: ${md}. Write immersive prose in second person ("You\u2026"). No game-mechanics language. Never break the fourth wall.${pLine}${memLine}${itemsLine}${condLine}\n\nCRITICAL RULE: Never write any dialogue, speech, decisions, or actions performed BY the player character. Other characters may speak and act freely, and you may describe things happening TO or AROUND the player, but the player alone decides what they say or do next. Always end your response at a moment that leaves the next action open to the player \u2014 do not narrate or imply what they say, choose, or do.\n\nFormatting:\n- Wrap character/creature names in **double asterisks**\n- Wrap location/place names in *single asterisks*\n- Always use straight double quotes " " for any spoken dialogue, never single quotes\n- Never wrap dialogue in asterisks or combine it with italics \u2014 dialogue should be plain text inside its quotes\n- Do not wrap anything else`;
+  if(isJudge) return `You are a game master running a ${sl} setting with this plot engine: ${ed}. Analyse player actions. Respond ONLY with raw JSON \u2014 no markdown, no explanation.${pLine}${memLine}${itemsLine}${condLine}${loreLine}`;
+  return `You are the game master of a ${sl} setting RPG. Plot engine: ${ed}. Tone: ${md}. Write immersive prose in second person ("You\u2026"). No game-mechanics language. Never break the fourth wall.${pLine}${memLine}${itemsLine}${condLine}${loreLine}\n\nCRITICAL RULE: Never write any dialogue, speech, decisions, or actions performed BY the player character. Other characters may speak and act freely, and you may describe things happening TO or AROUND the player, but the player alone decides what they say or do next. Always end your response at a moment that leaves the next action open to the player \u2014 do not narrate or imply what they say, choose, or do.\n\nFormatting:\n- Wrap character/creature names in **double asterisks**\n- Wrap location/place names in *single asterisks*\n- Always use straight double quotes " " for any spoken dialogue, never single quotes\n- Never wrap dialogue in asterisks or combine it with italics \u2014 dialogue should be plain text inside its quotes\n- Do not wrap anything else`;
 }
 
 function memoryContextString(memory,books){
@@ -528,6 +529,7 @@ async function callClaude(messages,system,maxTokens){
     apiKey: target.key, model, messages, system, maxTokens: maxTokens||API_CONFIG.maxTokens,
   });
 
+  const _t0=Date.now();
   let res;
   try{
     res = await fetch(endpoint, {method:"POST", headers, body:JSON.stringify(body)});
@@ -559,6 +561,7 @@ async function callClaude(messages,system,maxTokens){
   }
   const text = providerDef.parseText(data);
   if(typeof text!=="string" || !text) throw new Error(`Empty or unrecognized response from "${target.name}" (check the Service Type is set correctly)`);
+  S.dbgAcc.calls++; S.dbgAcc.ms+=Date.now()-_t0;
   return text;
 }
 /* LLMs sometimes wrap JSON in markdown code fences, or occasionally return
@@ -702,6 +705,13 @@ const S = {
   autosaveEnabled: true,
   lastSaveTurnCount: 0,
   autosaveMeta: null,
+  lorebook: null,
+  lorebookOpen: false,
+  lorebookMsg: null,
+  debug: (function(){ try{ return window.localStorage.getItem("woven_fate_debug")==="1"; }catch(e){ return false; } })(),
+  settingsHubOpen: false,
+  lastLoreStats: null,
+  dbgAcc: {calls:0,ms:0},
 };
 let autosaveInFlight = false;
 function busy(){ return S.status !== "idle"; }
@@ -760,6 +770,7 @@ function setState(updater, updateFn){
   updater(S);
   persistSession();
   (updateFn || render)();
+  refreshSettingsHub();
 }
 
 const SESSION_STORAGE_KEY = "woven_fate_session_v1";
@@ -768,7 +779,7 @@ function persistSession(){
     window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
       dark:S.dark, mood:S.mood, setting:S.setting, engine:S.engine,
       player:S.player, memory:S.memory, books:S.books, msgs:S.msgs,
-      history:S.history, screen:S.screen, autosaveEnabled:S.autosaveEnabled,
+      history:S.history, screen:S.screen, autosaveEnabled:S.autosaveEnabled, lorebook:S.lorebook,
       savedAt:Date.now(),
     }));
   }catch(e){ /* storage full/unavailable \u2014 non-fatal, Tales saves are the durable store */ }
@@ -844,8 +855,224 @@ function handleMergeCharacters(){
   }, updateJournalUI);
 }
 
-function playerInfo(){
+/* ============================== INPUT SAFETY ============================== */
+const BAD_KEYS=new Set(["__proto__","constructor","prototype"]);
+const LORE_FILE_MAX_CHARS=2000000;
+/* Strips C0/C1 controls (keeps \n and \t), zero-width/BOM and bidi-override characters; normalises line breaks. */
+const CTRL_RE=/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B\u2060-\u2064\u202A-\u202E\u2066-\u2069\uFEFF\uFFF9-\uFFFB]/g;
+function cleanText(s,max){
+  s=String(s).replace(/\r\n?|[\u2028\u2029]/g,"\n").replace(CTRL_RE,"");
+  return max&&s.length>max?s.slice(0,max):s;
+}
+/* Recursively rebuilds parsed JSON: drops prototype-pollution keys (checked after cleaning), cleans strings, caps depth/size. */
+function sanitizeDeep(v,depth,c){
+  depth=depth||0; c=c||{n:0};
+  if(++c.n>200000) throw new Error("File has too many values.");
+  if(depth>16) throw new Error("File is nested too deeply.");
+  if(typeof v==="string") return cleanText(v,100000);
+  if(typeof v==="number") return Number.isFinite(v)?v:0;
+  if(v===null||typeof v==="boolean") return v;
+  if(Array.isArray(v)){
+    if(v.length>20000) throw new Error("File has an array that is too long.");
+    return v.map(x=>sanitizeDeep(x,depth+1,c));
+  }
+  if(typeof v==="object"){
+    const o={};
+    for(const k of Object.keys(v)){
+      const ck=cleanText(k,200);
+      if(BAD_KEYS.has(ck)||BAD_KEYS.has(k)) continue;
+      o[ck]=sanitizeDeep(v[k],depth+1,c);
+    }
+    return o;
+  }
+  return undefined;
+}
+function safeParseJSON(text,maxChars){
+  if(typeof text!=="string") throw new Error("File is not text.");
+  if(text.length>maxChars) throw new Error("File is too large.");
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  return sanitizeDeep(JSON.parse(text,(k,v)=>BAD_KEYS.has(k)?undefined:v));
+}
+function checkFileObject(file,maxBytes){
+  if(!/\.json$/i.test(file.name||"") && !/json/i.test(file.type||"")) throw new Error("Please choose a .json file.");
+  if(file.size>maxBytes) throw new Error("File is too large.");
+}
+const isArr=Array.isArray, isStr=x=>typeof x==="string";
+/* Structural validation for imported / stored saves. Throws if the shape is wrong. */
+function validateSave(d){
+  const bad=()=>{ throw new Error("Not a valid save file."); };
+  if(!d||typeof d!=="object"||isArr(d)||!isStr(d.name)||!d.name||!isArr(d.msgs)) bad();
+  if(d.msgs.length>5000||d.msgs.some(m=>!m||typeof m!=="object"||!isStr(m.type))) bad();
+  if(d.history!==undefined&&(!isArr(d.history)||d.history.length>200||d.history.some(m=>!m||(m.role!=="user"&&m.role!=="assistant")||!isStr(m.content)))) bad();
+  for(const k of ["characters","items","keyItems","completedQuests","names","books"]) if(d[k]!==undefined&&!isArr(d[k])) bad();
+  for(const k of ["mood","setting","engine","gender","desc"]) if(d[k]!==undefined&&d[k]!==null&&!isStr(d[k])) bad();
+  if(d.lorebook) d.lorebook=normalizeLorebook(d.lorebook); else delete d.lorebook;
+  if(d.dynLore){
+    const dl=d.dynLore; if(typeof dl!=="object"||isArr(dl)) bad();
+    d.dynLore={story:isStr(dl.story)?dl.story.slice(0,1500):"",budget:Math.min(100000,Math.max(500,Math.floor(Number(dl.budget))||4000)),
+      turn:Math.max(0,Math.floor(Number(dl.turn))||0),pending:[],
+      entries:(isArr(dl.entries)?dl.entries:[]).slice(0,150).filter(e=>e&&isStr(e.name)&&isStr(e.content)&&isArr(e.keys)).map(e=>({
+        name:e.name.slice(0,100),keys:e.keys.filter(isStr).map(k=>k.slice(0,64)).slice(0,12),content:e.content.slice(0,600),
+        priority:Math.min(10,Math.max(1,Math.round(Number(e.priority))||5)),turn:Math.floor(Number(e.turn))||0}))};
+  }
+  return d;
+}
+function parseStoredSave(text){ return validateSave(safeParseJSON(text,SAVE_SIZE_LIMIT_BYTES)); }
+
+/* ============================== LOREBOOK ============================== */
+const LORE_DEFAULT_BUDGET=8000, LORE_SCAN_MESSAGES=4;
+function normalizeLorebook(d){
+  if(!d || typeof d!=="object" || !Array.isArray(d.entries)) throw new Error("No \"entries\" array found.");
+  if(d.entries.length>1000) throw new Error("Too many entries (max 1000).");
+  const entries=d.entries.map(e=>({
+    name:cleanText((e&&e.name)||"Untitled",100).trim()||"Untitled",
+    keys:(Array.isArray(e&&e.keys)?e.keys:[]).slice(0,50)
+      .map(k=>cleanText(k,64).trim().replace(/\*+/g,"*"))
+      .filter(k=>/[\p{L}\p{N}]/u.test(k) && (k.match(/\*/g)||[]).length<=2),  // needs a real character; max 2 wildcards (ReDoS guard)
+    content:cleanText((e&&e.content)||"",10000).trim(),
+    priority:Math.min(10,Math.max(1,Math.round(Number(e&&e.priority))||5)),
+  })).filter(e=>e.content && e.keys.length);
+  if(!entries.length) throw new Error("No usable entries (each needs keys and content).");
+  const cap=n=>Math.min(100000,n);
+  const b=Number(d.character_budget), fb=cap(b>0?Math.floor(b):LORE_DEFAULT_BUDGET);
+  /* file_budget keeps the file's own value so a manual override (character_budget) can be reset. */
+  const ob=Number(d.file_budget);
+  return {name:cleanText(d.name||"Lorebook",100),description:cleanText(d.description||"",500),
+    character_budget:fb,file_budget:ob>0?cap(Math.floor(ob)):fb,entries};
+}
+/* Normalise curly quotes, then match a key as a whole word/phrase; "*" matches any word characters. */
+function loreNorm(t){ return String(t).slice(-20000).toLowerCase().replace(/[\u2018\u2019]/g,"'"); }
+const LORE_RE_CACHE=new Map();
+function loreKeyRegex(key){
+  let re=LORE_RE_CACHE.get(key); if(re) return re;
+  if(LORE_RE_CACHE.size>5000) LORE_RE_CACHE.clear();
+  re=loreKeyRegexBuild(key); LORE_RE_CACHE.set(key,re); return re;
+}
+function loreKeyRegexBuild(key){
+  const parts=loreNorm(key).split("*").map(x=>x.replace(/[.+?^${}()|[\]\\]/g,"\\$&"));
+  return new RegExp("(^|[^\\p{L}\\p{N}])"+parts.join("[\\p{L}\\p{N}_]*")+"(?![\\p{L}\\p{N}])","u");
+}
+function entryMatches(entry,text){ return entry.keys.some(k=>{ try{ return loreKeyRegex(k).test(text); }catch(e){ return false; } }); }
+/* Matched entries are tried priority 1 -> 10 (random order within a priority). An entry that
+   doesn't fit the remaining budget is skipped and the rest are still tried. */
+function buildLoreContext(extraText){
+  const lb=S.lorebook; if(!lb){ S.lastLoreStats={has:false}; return ""; }
+  const recent=S.history.slice(-LORE_SCAN_MESSAGES).map(m=>m.content).join("\n");
+  const text=loreNorm(`${recent}\n${extraText||""}`);
+  const matched=lb.entries.filter(e=>entryMatches(e,text));
+  /* Budget is charged by content length only \u2014 the [name] header and separators are free. */
+  const out=[], added=[]; let remaining=lb.character_budget;
+  for(let pr=1;pr<=10 && remaining>0;pr++){
+    for(const e of shuffle(matched.filter(x=>x.priority===pr))){
+      if(e.content.length<=remaining){ out.push(`[${e.name}] ${e.content}`); added.push(e); remaining-=e.content.length; }
+    }
+  }
+  S.lastLoreStats={has:true,triggered:matched.length,added:added.map(e=>e.name),
+    skipped:matched.filter(e=>!added.includes(e)).map(e=>e.name),used:lb.character_budget-remaining,budget:lb.character_budget};
+  return out.join("\n\n");
+}
+function loadLorebookFile(ev){
+  const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+  try{ checkFileObject(file,LORE_FILE_MAX_CHARS); }
+  catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; renderLorebookModal(); ev.target.value=""; return; }
+  const reader=new FileReader();
+  reader.onload=fev=>{
+    try{ S.lorebook=normalizeLorebook(safeParseJSON(fev.target.result,LORE_FILE_MAX_CHARS)); S.lorebookMsg={ok:true,text:`Loaded "${S.lorebook.name}".`}; }
+    catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; }
+    persistSession(); renderLorebookModal(); refreshLorebookSetupRow(); ev.target.value="";
+  };
+  reader.readAsText(file);
+}
+function lorebookSummary(){
+  const lb=S.lorebook; if(!lb) return "No lorebook loaded.";
+  return `${lb.name} \u00b7 ${lb.entries.length} entries \u00b7 ${lb.character_budget} character budget`;
+}
+function renderLorebookModal(){
+  refreshSettingsHub();
+  let el=document.getElementById("lorebookModal");
+  if(!S.lorebookOpen){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement("div"); el.id="lorebookModal"; document.body.appendChild(el); }
+  const lb=S.lorebook, m=S.lorebookMsg;
+  const bs="padding:7px 16px;background:transparent;border:1px solid var(--acc);border-radius:4px;color:var(--accHi);cursor:pointer;font-size:12px";
+  el.innerHTML=`<div data-lb="close" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:var(--bgCard);border:1px solid var(--bdrM);border-radius:8px;padding:20px;max-width:440px;width:100%;color:var(--text);max-height:90vh;overflow:auto">
+      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);margin-bottom:12px">Lorebook</div>
+      <div style="font-size:13px;margin-bottom:6px">${escapeHtml(lorebookSummary())}</div>
+      ${lb&&lb.description?`<div style="font-size:11px;color:var(--textD);margin-bottom:6px">${escapeHtml(lb.description)}</div>`:""}
+      <div style="font-size:10px;color:var(--textD);margin-bottom:14px">Entries are pulled in when their keys appear in the player's description or the recent story. Lower priority numbers are filled first, within the character budget. Changes apply from the next turn.</div>
+      ${lb?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:${lb.character_budget>16000?"6px":"14px"};font-size:12px"><span>Character budget</span><input type="number" min="0" step="500" data-lb="budget" value="${lb.character_budget}" style="width:90px"/><span style="font-size:10px;color:var(--textD)">File default: ${lb.file_budget}</span>${lb.character_budget!==lb.file_budget?`<button data-lb="resetbudget" style="background:none;border:none;color:var(--accHi);cursor:pointer;font-size:11px;text-decoration:underline">Reset</button>`:""}</div>${lb.character_budget>16000?`<div style="font-size:10px;color:var(--delClr);margin-bottom:14px">A large budget can take a big share of the model's context window.</div>`:""}`:""}
+      ${m?`<div style="font-size:12px;margin-bottom:12px;color:${m.ok?"var(--accHi)":"var(--delClr)"}">${escapeHtml(m.text)}</div>`:""}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button data-lb="pick" style="${bs}">${lb?"Replace\u2026":"Load lorebook\u2026"}</button>
+        ${lb?`<button data-lb="remove" style="${bs};border-color:var(--bdrM);color:var(--textM)">Remove</button>`:""}
+        <button data-lb="close" style="${bs};border-color:var(--bdrM);color:var(--textM);margin-left:auto">Close</button>
+      </div>
+      <input type="file" id="lorebookFileInput" accept="application/json,.json" style="display:none"/>
+    </div></div>`;
+  el.querySelector("[data-lb=close]").addEventListener("click",e=>{ if(e.target===e.currentTarget) closeLorebook(); });
+  el.querySelectorAll("button[data-lb=close]").forEach(b=>b.addEventListener("click",closeLorebook));
+  el.querySelector("[data-lb=pick]").addEventListener("click",()=>document.getElementById("lorebookFileInput").click());
+  const setBudget=v=>{ S.lorebook.character_budget=v; persistSession(); renderLorebookModal(); };
+  const bi=el.querySelector("[data-lb=budget]");
+  if(bi) bi.addEventListener("change",e=>{ const v=Math.floor(Number(e.target.value)); setBudget(Number.isFinite(v)&&v>=0?v:S.lorebook.file_budget); });
+  const rb=el.querySelector("[data-lb=resetbudget]");
+  if(rb) rb.addEventListener("click",()=>setBudget(S.lorebook.file_budget));
+  const rm=el.querySelector("[data-lb=remove]");
+  if(rm) rm.addEventListener("click",()=>{ S.lorebook=null; S.lorebookMsg=null; persistSession(); renderLorebookModal(); refreshLorebookSetupRow(); });
+  document.getElementById("lorebookFileInput").addEventListener("change",loadLorebookFile);
+}
+function openLorebook(){ S.lorebookOpen=true; S.lorebookMsg=null; renderLorebookModal(); }
+function closeLorebook(){ S.lorebookOpen=false; renderLorebookModal(); }
+function refreshLorebookSetupRow(){ const el=document.getElementById("loreSetupSummary"); if(el) el.textContent=lorebookSummary(); }
+
+/* ============================== SETTINGS HUB & DEBUG ============================== */
+function debugStatsHtml(d){
+  const L=d.lore, rows=[];
+  if(!L || !L.has) rows.push("Lorebook: none loaded");
+  else {
+    rows.push(`Lorebook: ${L.triggered} triggered \u00b7 ${L.added.length} added to context \u00b7 ${L.skipped.length} skipped (no room) \u00b7 ${L.used}/${L.budget} chars`);
+    if(L.added.length) rows.push(`Added: ${L.added.join(", ")}`);
+    if(L.skipped.length) rows.push(`Skipped: ${L.skipped.join(", ")}`);
+  }
+  rows.push(`API calls: ${d.calls} \u00b7 ${(d.ms/1000).toFixed(1)}s \u00b7 response ${d.chars} chars`);
+  return `<div style="margin-top:8px;padding:6px 10px;border:1px dashed var(--bdrM);border-radius:4px;font:11px/1.5 monospace;color:var(--textD)">${rows.map(escapeHtml).join("<br>")}</div>`;
+}
+function activeTargetSummary(){
+  const t=activeTarget(); if(!t) return "None selected";
+  const pd=PROVIDERS[t.provider]||PROVIDERS.anthropic;
+  return `${t.name} \u00b7 ${(t.model&&t.model.trim())||pd.defaultModel||"model not set"}`;
+}
+function refreshSettingsHub(){
+  const el=document.getElementById("settingsHub");
+  if(!S.settingsHubOpen){ if(el) el.remove(); return; }
+  const host=el||Object.assign(document.createElement("div"),{id:"settingsHub"});
+  if(!el) document.body.appendChild(host);
+  const row="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;background:var(--bgGenre);border:1px solid var(--bdrM);border-radius:6px;color:var(--text);cursor:pointer;font-size:13px";
+  const val="font-size:11px;color:var(--textD);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+  host.innerHTML=`<div data-sh="close" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:var(--bgCard);border:1px solid var(--bdrM);border-radius:8px;padding:20px;max-width:440px;width:100%;color:var(--text);display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);margin-bottom:4px">Settings</div>
+      <button data-sh="api" style="${row}"><span>API Target</span><span style="${val}">${escapeHtml(activeTargetSummary())}</span></button>
+      <button data-sh="lore" style="${row}"><span>Lorebook</span><span style="${val}">${escapeHtml(lorebookSummary())}</span></button>
+      <label style="${row};cursor:pointer"><span>Debug stats<br><span style="font-size:10px;color:var(--textD)">Show lorebook and API stats under each response</span></span><input type="checkbox" data-sh="debug" ${S.debug?"checked":""}/></label>
+      <button data-sh="close" style="align-self:flex-end;padding:7px 16px;background:transparent;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);cursor:pointer;font-size:12px">Close</button>
+    </div></div>`;
+  host.querySelector("div[data-sh=close]").addEventListener("click",e=>{ if(e.target===e.currentTarget) closeSettingsHub(); });
+  host.querySelector("button[data-sh=close]").addEventListener("click",closeSettingsHub);
+  host.querySelector("[data-sh=api]").addEventListener("click",openSettingsModal);
+  host.querySelector("[data-sh=lore]").addEventListener("click",openLorebook);
+  host.querySelector("[data-sh=debug]").addEventListener("change",e=>{
+    S.debug=e.target.checked;
+    try{ window.localStorage.setItem("woven_fate_debug",S.debug?"1":"0"); }catch(err){}
+    const list=document.getElementById("msgList"); if(list) list.innerHTML=renderMsgListHtml();
+  });
+}
+function openSettingsHub(){ S.settingsHubOpen=true; refreshSettingsHub(); }
+function closeSettingsHub(){ S.settingsHubOpen=false; refreshSettingsHub(); }
+
+function playerInfo(extraText){
   return {
+    loreContext: buildLoreContext(extraText || S.player.desc),
     gender: S.player.gender,
     desc: S.player.desc.trim(),
     memoryContext: memoryContextString(S.memory, S.books),
@@ -1159,7 +1386,7 @@ async function performAutosave(narratorCountAtCall){
     const name = `Autosave \u2014 ${labelFor(MOODS,S.mood)} ${labelFor(SETTINGS,S.setting)}${engineLabel}${namesSuffix}`;
     const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
       gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
-      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,lorebook:S.lorebook,
       savedAt:Date.now(),isAutosave:true};
     const payloadStr=JSON.stringify(payload);
     if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
@@ -1188,14 +1415,20 @@ function maybeAutosave(){
   }
 }
 
+function takeDebugSnapshot(text){
+  const d={lore:S.lastLoreStats,calls:S.dbgAcc.calls,ms:S.dbgAcc.ms,chars:(text||"").length};
+  S.dbgAcc={calls:0,ms:0};
+  return d;
+}
 async function commitNarrative(text,userContent,extraFields){
-  extraFields = extraFields || {};
+  extraFields = {debug:takeDebugSnapshot(text),...(extraFields||{})};
   S.msgs=[...S.msgs,{type:"narrator",text,...extraFields}];
   appendMessage(S.msgs[S.msgs.length-1]); // targeted DOM update: append, don't rebuild the log
   const newHistory = userContent===null ? [...S.history,{role:"assistant",content:text}] : [...S.history,{role:"user",content:userContent},{role:"assistant",content:text}];
   await compactHistory(newHistory);
   await tagQuestFromExtraction(text,playerInfo());
   refreshLastMessageNode(); // tagQuestFromExtraction may have annotated the message just appended
+  S.dbgAcc={calls:0,ms:0};
 }
 
 async function runStep(coreFn,retryKind,retryPayload,replaceIdx){
@@ -1222,7 +1455,7 @@ async function runStep(coreFn,retryKind,retryPayload,replaceIdx){
 }
 
 async function narratorTurnCore(action){
-  const pInfo=playerInfo();
+  const pInfo=playerInfo(typeof action==="string"?action:"");
   const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and active conditions (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the player's active moderate/severe negative conditions (working against them) and positive conditions (working in their favor), using this same single modifier tier. Never let superficial conditions influence this. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true));
   const parsed=parseJSON(raw,null);
   if(!parsed || typeof parsed!=="object" || !parsed.resolution){
@@ -1490,13 +1723,14 @@ async function startGame(){
   S.player.quest=null; S.player.keyItems=[]; S.player.items=[]; S.player.characters=[]; S.player.completedQuests=[]; S.player.names=[]; S.player.conditions=JSON.parse(JSON.stringify(DEFAULT_CONDITIONS));
   S.status="narrating";
   render();
+  S.dbgAcc={calls:0,ms:0};
   const results = await Promise.all([deriveTools(g,d,s,e), deriveCharacterNames(d)]);
   const toolsResult=results[0], namesResult=results[1];
   S.player.tools=toolsResult; S.player.names=namesResult;
   const sObj=SETTINGS.find(x=>x.key===s); const sl=sObj?sObj.label:s;
   const eObj=ENGINES.find(x=>x.key===e); const el=eObj?eObj.label:e;
   const ml=(MOODS.find(x=>x.key===m)||{}).label||m;
-  const pInfo={gender:g,desc:d.trim()};
+  const pInfo={gender:g,desc:d.trim(),loreContext:buildLoreContext(d)};
   const pBits=[];
   if(g!=="undefined") pBits.push(`a ${g} character`);
   if(d.trim()) pBits.push(`described as: ${d.trim()}`);
@@ -1509,7 +1743,7 @@ async function startGame(){
 
   await runStep(async()=>{
     const text=await callClaude([{role:"user",content:`Begin a new story set in a ${sl} world, with a ${el==="Story-Driven"?"plot that emerges naturally from the setting":el+" plot engine"}, and a ${ml} tone.${pClause} Vivid atmospheric opening, immediate tension, end on a moment of choice. 2\u20133 paragraphs, second person. Bold character names, italicise place names.`}],buildSystem(m,s,e,pInfo));
-    S.msgs=[...S.msgs,{type:"narrator",text}];
+    S.msgs=[...S.msgs,{type:"narrator",text,debug:takeDebugSnapshot(text)}];
     appendMessage(S.msgs[S.msgs.length-1]);
     S.history=[{role:"assistant",content:text}];
     await tagQuestFromExtraction(text,pInfo,{tools:toolsResult,quest:null,keyItems:[],items:[],characters:[],conditions:JSON.parse(JSON.stringify(DEFAULT_CONDITIONS))});
@@ -1534,7 +1768,7 @@ async function handleSaveCurrent(asNew){
   try{
     const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
       gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
-      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,lorebook:S.lorebook,
       savedAt:Date.now()};
     const payloadStr=JSON.stringify(payload);
     if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
@@ -1568,7 +1802,7 @@ async function handleLoadSave(id){
       render();
       return;
     }
-    const d=JSON.parse(r.value);
+    const d=parseStoredSave(r.value);
     S.msgs=d.msgs||[]; S.history=d.history||[]; S.mood=d.mood||null;
     S.setting=d.setting||null; S.engine=d.engine||"story_driven";
     S.player={
@@ -1582,6 +1816,7 @@ async function handleLoadSave(id){
       conditions:d.conditions||JSON.parse(JSON.stringify(DEFAULT_CONDITIONS)),
     };
     S.memory=d.memory||JSON.parse(JSON.stringify(DEFAULT_MEMORY));
+    S.lorebook=d.lorebook||null;
     S.books=d.books||[];
     S.activeBookTab=Math.max(0,(d.books||[]).length-1);
     S.saveTracking={activeSaveId:id,turnsAtSave:(d.msgs||[]).filter(m=>m.type==="narrator").length,result:"loaded",message:null};
@@ -1653,14 +1888,14 @@ function handleImportFile(ev){
   if(busy()){ ev.target.value=""; return; }
   const file=ev.target.files && ev.target.files[0];
   if(!file)return;
+  try{ checkFileObject(file,SAVE_SIZE_LIMIT_BYTES); }catch(e){ S.importStatus=/large/.test(e.message)?"too_large":"error"; render(); ev.target.value=""; return; }
   S.importStatus=null;
   render();
   const reader=new FileReader();
   reader.onload=async(fev)=>{
     let d;
-    try{ d=JSON.parse(fev.target.result); }
-    catch(e){ S.importStatus="error"; render(); ev.target.value=""; return; }
-    if(!d || !d.name || !d.msgs){ S.importStatus="error"; render(); ev.target.value=""; return; }
+    try{ d=validateSave(safeParseJSON(fev.target.result,SAVE_SIZE_LIMIT_BYTES)); }
+    catch(e){ S.importStatus=/large/.test(e.message)?"too_large":"error"; render(); ev.target.value=""; return; }
     try{
       const id=newId();
       d.savedAt=Date.now();
@@ -1697,7 +1932,7 @@ function toggleThemeBtnHtml(){
 }
 
 function settingsIconBtnHtml(){
-  return `<button id="settingsIconBtn" class="toggle-theme-btn" data-act="openSettings" title="Anthropic API key settings">\u2699</button>`;
+  return `<button id="settingsIconBtn" class="toggle-theme-btn" data-act="openSettingsHub" title="Settings">\u2699</button>`;
 }
 
 function headerBarHtml(rightExtra){
@@ -1705,6 +1940,7 @@ function headerBarHtml(rightExtra){
     <div style="flex:1"></div>
     <span style="flex:0 0 auto;font-size:15px;color:var(--acc);letter-spacing:4px;text-transform:uppercase">\u25c8 &nbsp; The Woven Fate &nbsp; \u25c8</span>
     <div style="flex:1;display:flex;justify-content:flex-end;gap:8px;align-items:center">
+      <button class="toggle-theme-btn" data-act="openLorebook" title="Lorebook">\ud83d\udcd6</button>
       ${settingsIconBtnHtml()}
       ${toggleThemeBtnHtml()}
       ${rightExtra||""}
@@ -1794,6 +2030,7 @@ function renderSettingsModalHtml(){
 function updateSettingsModal(){
   const el=document.getElementById("settingsModalContainer");
   if(el) el.innerHTML = renderSettingsModalHtml();
+  refreshSettingsHub();
 }
 function blankTargetForm(){
   const url = API_CONFIG.defaultUrl;
@@ -2021,6 +2258,14 @@ function renderSetupScreen(){
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">${genderRow}</div>
       <textarea id="playerDescInput" placeholder="Optional: briefly describe your character \u2014 name, appearance, background, personality, occupation, companions/crew\u2026" rows="3" style="width:100%;resize:vertical;box-sizing:border-box">${escapeHtml(S.player.desc)}</textarea>
       <div style="font-size:10px;color:var(--textD);margin-top:6px">Mentioning an occupation (e.g. "a knight", "a cowboy") or a team/crew will shape your starting tools of the trade and supporting cast.</div>
+    </div>
+
+    <div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Lorebook <span style="letter-spacing:0;text-transform:none">(optional)</span></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button data-act="openLorebook" class="fade-btn" style="padding:7px 14px;font-size:12px;border:1px solid var(--bdrM);background:transparent;color:var(--textM)">\ud83d\udcd6 Load / manage</button>
+        <span id="loreSetupSummary" style="font-size:11px;color:var(--textD)">${escapeHtml(lorebookSummary())}</span>
+      </div>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
@@ -2258,6 +2503,7 @@ function renderOneMessageHtml(msg,i){
     const full=[...msg.inventoryFullTag.key.map(n=>`${n} (key items full)`),...msg.inventoryFullTag.general.map(n=>`${n} (items full)`)].join(", ");
     out += `<div style="font-size:11px;color:${OUTCOME_META.failure.color};letter-spacing:0.5px;margin-top:8px;opacity:0.9">\u26a0 Inventory full \u2014 couldn't carry: ${escapeHtml(full)}</div>`;
   }
+  if(S.debug && msg.debug) out += debugStatsHtml(msg.debug);
   return `<div data-msg-idx="${i}">${out}</div>`;
 }
 function renderMsgListHtml(){
@@ -2569,6 +2815,8 @@ document.addEventListener("DOMContentLoaded", function(){
         break;
       }
       case "openSettings": openSettingsModal(); break;
+      case "openSettingsHub": openSettingsHub(); break;
+      case "openLorebook": openLorebook(); break;
       case "closeSettings": {
         if(S.apiTargets.length===0) break; // can't close out of the forced "add one" state
         setState(s=>{ s.settingsOpen=false; }, updateSettingsModal);

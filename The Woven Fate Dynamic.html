@@ -857,26 +857,100 @@ function handleMergeCharacters(){
   }, updateJournalUI);
 }
 
+/* ============================== INPUT SAFETY ============================== */
+const BAD_KEYS=new Set(["__proto__","constructor","prototype"]);
+const LORE_FILE_MAX_CHARS=2000000;
+/* Strips C0/C1 controls (keeps \n and \t), zero-width/BOM and bidi-override characters; normalises line breaks. */
+const CTRL_RE=/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B\u2060-\u2064\u202A-\u202E\u2066-\u2069\uFEFF\uFFF9-\uFFFB]/g;
+function cleanText(s,max){
+  s=String(s).replace(/\r\n?|[\u2028\u2029]/g,"\n").replace(CTRL_RE,"");
+  return max&&s.length>max?s.slice(0,max):s;
+}
+/* Recursively rebuilds parsed JSON: drops prototype-pollution keys (checked after cleaning), cleans strings, caps depth/size. */
+function sanitizeDeep(v,depth,c){
+  depth=depth||0; c=c||{n:0};
+  if(++c.n>200000) throw new Error("File has too many values.");
+  if(depth>16) throw new Error("File is nested too deeply.");
+  if(typeof v==="string") return cleanText(v,100000);
+  if(typeof v==="number") return Number.isFinite(v)?v:0;
+  if(v===null||typeof v==="boolean") return v;
+  if(Array.isArray(v)){
+    if(v.length>20000) throw new Error("File has an array that is too long.");
+    return v.map(x=>sanitizeDeep(x,depth+1,c));
+  }
+  if(typeof v==="object"){
+    const o={};
+    for(const k of Object.keys(v)){
+      const ck=cleanText(k,200);
+      if(BAD_KEYS.has(ck)||BAD_KEYS.has(k)) continue;
+      o[ck]=sanitizeDeep(v[k],depth+1,c);
+    }
+    return o;
+  }
+  return undefined;
+}
+function safeParseJSON(text,maxChars){
+  if(typeof text!=="string") throw new Error("File is not text.");
+  if(text.length>maxChars) throw new Error("File is too large.");
+  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+  return sanitizeDeep(JSON.parse(text,(k,v)=>BAD_KEYS.has(k)?undefined:v));
+}
+function checkFileObject(file,maxBytes){
+  if(!/\.json$/i.test(file.name||"") && !/json/i.test(file.type||"")) throw new Error("Please choose a .json file.");
+  if(file.size>maxBytes) throw new Error("File is too large.");
+}
+const isArr=Array.isArray, isStr=x=>typeof x==="string";
+/* Structural validation for imported / stored saves. Throws if the shape is wrong. */
+function validateSave(d){
+  const bad=()=>{ throw new Error("Not a valid save file."); };
+  if(!d||typeof d!=="object"||isArr(d)||!isStr(d.name)||!d.name||!isArr(d.msgs)) bad();
+  if(d.msgs.length>5000||d.msgs.some(m=>!m||typeof m!=="object"||!isStr(m.type))) bad();
+  if(d.history!==undefined&&(!isArr(d.history)||d.history.length>200||d.history.some(m=>!m||(m.role!=="user"&&m.role!=="assistant")||!isStr(m.content)))) bad();
+  for(const k of ["characters","items","keyItems","completedQuests","names","books"]) if(d[k]!==undefined&&!isArr(d[k])) bad();
+  for(const k of ["mood","setting","engine","gender","desc"]) if(d[k]!==undefined&&d[k]!==null&&!isStr(d[k])) bad();
+  if(d.lorebook) d.lorebook=normalizeLorebook(d.lorebook); else delete d.lorebook;
+  if(d.dynLore){
+    const dl=d.dynLore; if(typeof dl!=="object"||isArr(dl)) bad();
+    d.dynLore={story:isStr(dl.story)?dl.story.slice(0,1500):"",budget:Math.min(100000,Math.max(500,Math.floor(Number(dl.budget))||4000)),
+      turn:Math.max(0,Math.floor(Number(dl.turn))||0),pending:[],
+      entries:(isArr(dl.entries)?dl.entries:[]).slice(0,150).filter(e=>e&&isStr(e.name)&&isStr(e.content)&&isArr(e.keys)).map(e=>({
+        name:e.name.slice(0,100),keys:e.keys.filter(isStr).map(k=>k.slice(0,64)).slice(0,12),content:e.content.slice(0,600),
+        priority:Math.min(10,Math.max(1,Math.round(Number(e.priority))||5)),turn:Math.floor(Number(e.turn))||0}))};
+  }
+  return d;
+}
+function parseStoredSave(text){ return validateSave(safeParseJSON(text,SAVE_SIZE_LIMIT_BYTES)); }
+
 /* ============================== LOREBOOK ============================== */
 const LORE_DEFAULT_BUDGET=8000, LORE_SCAN_MESSAGES=4;
 function normalizeLorebook(d){
-  if(!d || !Array.isArray(d.entries)) throw new Error("No \"entries\" array found.");
+  if(!d || typeof d!=="object" || !Array.isArray(d.entries)) throw new Error("No \"entries\" array found.");
+  if(d.entries.length>1000) throw new Error("Too many entries (max 1000).");
   const entries=d.entries.map(e=>({
-    name:String((e&&e.name)||"Untitled"),
-    keys:(Array.isArray(e&&e.keys)?e.keys:[]).map(k=>String(k).trim()).filter(Boolean),
-    content:String((e&&e.content)||"").trim(),
+    name:cleanText((e&&e.name)||"Untitled",100).trim()||"Untitled",
+    keys:(Array.isArray(e&&e.keys)?e.keys:[]).slice(0,50)
+      .map(k=>cleanText(k,64).trim().replace(/\*+/g,"*"))
+      .filter(k=>/[\p{L}\p{N}]/u.test(k) && (k.match(/\*/g)||[]).length<=2),  // needs a real character; max 2 wildcards (ReDoS guard)
+    content:cleanText((e&&e.content)||"",10000).trim(),
     priority:Math.min(10,Math.max(1,Math.round(Number(e&&e.priority))||5)),
   })).filter(e=>e.content && e.keys.length);
   if(!entries.length) throw new Error("No usable entries (each needs keys and content).");
-  const b=Number(d.character_budget), fb=b>0?Math.floor(b):LORE_DEFAULT_BUDGET;
+  const cap=n=>Math.min(100000,n);
+  const b=Number(d.character_budget), fb=cap(b>0?Math.floor(b):LORE_DEFAULT_BUDGET);
   /* file_budget keeps the file's own value so a manual override (character_budget) can be reset. */
   const ob=Number(d.file_budget);
-  return {name:String(d.name||"Lorebook"),description:String(d.description||""),
-    character_budget:fb,file_budget:ob>0?Math.floor(ob):fb,entries};
+  return {name:cleanText(d.name||"Lorebook",100),description:cleanText(d.description||"",500),
+    character_budget:fb,file_budget:ob>0?cap(Math.floor(ob)):fb,entries};
 }
 /* Normalise curly quotes, then match a key as a whole word/phrase; "*" matches any word characters. */
-function loreNorm(t){ return String(t).toLowerCase().replace(/[\u2018\u2019]/g,"'"); }
+function loreNorm(t){ return String(t).slice(-20000).toLowerCase().replace(/[\u2018\u2019]/g,"'"); }
+const LORE_RE_CACHE=new Map();
 function loreKeyRegex(key){
+  let re=LORE_RE_CACHE.get(key); if(re) return re;
+  if(LORE_RE_CACHE.size>5000) LORE_RE_CACHE.clear();
+  re=loreKeyRegexBuild(key); LORE_RE_CACHE.set(key,re); return re;
+}
+function loreKeyRegexBuild(key){
   const parts=loreNorm(key).split("*").map(x=>x.replace(/[.+?^${}()|[\]\\]/g,"\\$&"));
   return new RegExp("(^|[^\\p{L}\\p{N}])"+parts.join("[\\p{L}\\p{N}_]*")+"(?![\\p{L}\\p{N}])","u");
 }
@@ -947,9 +1021,11 @@ async function updateDynLore(action,text){
 
 function loadLorebookFile(ev){
   const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+  try{ checkFileObject(file,LORE_FILE_MAX_CHARS); }
+  catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; renderLorebookModal(); ev.target.value=""; return; }
   const reader=new FileReader();
   reader.onload=fev=>{
-    try{ S.lorebook=normalizeLorebook(JSON.parse(fev.target.result)); S.lorebookMsg={ok:true,text:`Loaded "${S.lorebook.name}".`}; }
+    try{ S.lorebook=normalizeLorebook(safeParseJSON(fev.target.result,LORE_FILE_MAX_CHARS)); S.lorebookMsg={ok:true,text:`Loaded "${S.lorebook.name}".`}; }
     catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; }
     persistSession(); renderLorebookModal(); refreshLorebookSetupRow(); ev.target.value="";
   };
@@ -1768,7 +1844,7 @@ async function handleLoadSave(id){
       render();
       return;
     }
-    const d=JSON.parse(r.value);
+    const d=parseStoredSave(r.value);
     S.msgs=d.msgs||[]; S.history=d.history||[]; S.mood=d.mood||null;
     S.setting=d.setting||null; S.engine=d.engine||"story_driven";
     S.player={
@@ -1855,14 +1931,14 @@ function handleImportFile(ev){
   if(busy()){ ev.target.value=""; return; }
   const file=ev.target.files && ev.target.files[0];
   if(!file)return;
+  try{ checkFileObject(file,SAVE_SIZE_LIMIT_BYTES); }catch(e){ S.importStatus=/large/.test(e.message)?"too_large":"error"; render(); ev.target.value=""; return; }
   S.importStatus=null;
   render();
   const reader=new FileReader();
   reader.onload=async(fev)=>{
     let d;
-    try{ d=JSON.parse(fev.target.result); }
-    catch(e){ S.importStatus="error"; render(); ev.target.value=""; return; }
-    if(!d || !d.name || !d.msgs){ S.importStatus="error"; render(); ev.target.value=""; return; }
+    try{ d=validateSave(safeParseJSON(fev.target.result,SAVE_SIZE_LIMIT_BYTES)); }
+    catch(e){ S.importStatus=/large/.test(e.message)?"too_large":"error"; render(); ev.target.value=""; return; }
     try{
       const id=newId();
       d.savedAt=Date.now();

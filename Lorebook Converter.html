@@ -110,11 +110,15 @@
     <script>
         // --- Core Conversion Logic ---
 
+        const DEFAULT_BUDGET = 8000;   // characters
+        const MAX_PRIORITY = 10;       // 1 = highest priority, 10 = lowest
+        const DEFAULT_PRIORITY = 5;
+
         function createWovenLorebook(data) {
             return {
                 name: data.name || "Unnamed Lorebook",
                 description: data.description || "",
-                character_budget: data.character_budget || data.token_budget || 5000,
+                character_budget: data.character_budget || data.token_budget || DEFAULT_BUDGET,
                 entries: data.entries || []
             };
         }
@@ -134,7 +138,7 @@
             return createWovenLorebook({
                 name: input.name,
                 description: input.description,
-                character_budget: input.token_budget || input.character_budget || 5000,
+                character_budget: input.token_budget || input.character_budget || DEFAULT_BUDGET,
                 entries: Object.values(input.entries || input)
                     .filter(e => e.content || e.text)
                     .map(entry => ({
@@ -168,7 +172,7 @@
             return createWovenLorebook({
                 name: input.name,
                 description: input.description,
-                character_budget: input.token_budget || 5000,
+                character_budget: input.token_budget || DEFAULT_BUDGET,
                 entries: entries
             });
         }
@@ -186,7 +190,7 @@
             return createWovenLorebook({
                 name: input.name || input.lorebook?.name,
                 description: input.description || input.lorebook?.description,
-                character_budget: input.token_budget || input.character_budget || 5000,
+                character_budget: input.token_budget || input.character_budget || DEFAULT_BUDGET,
                 entries: entries
             });
         }
@@ -196,15 +200,17 @@
         }
 
         function mapPriority(value) {
-            if (value === undefined || value === null) return 3;
-            if (value >= 1 && value <= 5) return Math.round(value);
+            if (value === undefined || value === null || isNaN(value)) return DEFAULT_PRIORITY;
+            // Already on the 1-10 scale: pass through
+            if (value >= 1 && value <= MAX_PRIORITY) return Math.round(value);
 
+            // Larger source values (e.g. insertion order) mean higher priority, i.e. a lower number
             if (value > 100) {
-                return Math.max(1, Math.min(5, 6 - Math.floor(value / 200)));
+                return Math.max(1, Math.min(MAX_PRIORITY, 11 - Math.floor(value / 100)));
             } else if (value > 0) {
-                return Math.max(1, Math.min(5, 6 - Math.floor(value / 20)));
+                return Math.max(1, Math.min(MAX_PRIORITY, 11 - Math.ceil(value / 10)));
             } else {
-                return 3;
+                return DEFAULT_PRIORITY;
             }
         }
 

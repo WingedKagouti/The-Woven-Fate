@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lorebook Test Bench</title>
+<script>
+/* Restore the saved theme before first paint (avoids a dark flash in light mode).
+   Only the two known values are accepted from storage. */
+(function () {
+  try {
+    var t = localStorage.getItem("lorebook-testbench-theme");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  } catch (e) { /* storage unavailable: stay on the default (dark) */ }
+})();
+</script>
+<style>
+:root {
+  color-scheme: dark;
+  --z950: #09090b; --z900: #18181b; --z800: #27272a; --z700: #3f3f46; --z600: #52525b;
+  --z500: #71717a; --z400: #a1a1aa; --z300: #d4d4d8; --z200: #e4e4e7; --z100: #f4f4f5;
+  --a100: #fef3c7; --a200: #fde68a; --a300: #fcd34d; --a400: #fbbf24; --a500: #f59e0b;
+  --sky: #7dd3fc; --em4: #34d399; --em3: #6ee7b7; --em5: #10b981;
+  --ro4: #fb7185; --ro3: #fda4af; --ro5: #f43f5e;
+  --panel-bg: rgba(24,24,27,.6); --row-line: rgba(39,39,42,.7); --chip-bg: rgba(39,39,42,.8);
+  --pr-a: #fda4af; --pr-b: #fdba74; --pr-c: #fcd34d; --pr-d: #fef08a; --pr-e: #d6d3d1;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* light theme: same variables, remapped */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --z950: #fafafa; --z900: #f4f4f5; --z800: #e4e4e7; --z700: #d4d4d8; --z600: #85858e;
+  --z500: #63636b; --z400: #52525b; --z300: #3f3f46; --z200: #27272a; --z100: #18181b;
+  --a100: #78350f; --a200: #92400e; --a300: #a94c08; --a400: #d97706; --a500: #f59e0b;
+  --sky: #0369a1; --em3: #065f46; --em4: #047857; --em5: #059669;
+  --ro3: #9f1239; --ro4: #be123c; --ro5: #e11d48;
+  --panel-bg: #ffffff; --row-line: #e4e4e7; --chip-bg: #ececf0;
+  --pr-a: #be123c; --pr-b: #b83a0a; --pr-c: #a94c08; --pr-d: #854d0e; --pr-e: #57534e;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--z950); color: var(--z200); font-family: var(--sans); line-height: 1.5; min-height: 100vh; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; text-align: left; }
+:focus-visible { outline: 2px solid var(--a400); outline-offset: 2px; }
+code { font-family: var(--mono); }
+.wrap { max-width: 72rem; margin: 0 auto; padding: 0 1rem 4rem; }
+
+/* header */
+header { border-bottom: 1px solid var(--z800); padding: 1.5rem 0; }
+h1 { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: .025em; color: var(--a200); }
+.sub { margin: .25rem 0 0; font-size: .875rem; color: var(--z400); }
+.sub b { font-weight: 400; color: var(--z300); }
+.sub2 { margin: .25rem 0 0; font-size: .75rem; color: var(--z500); }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.toolbar { margin-top: .75rem; font-size: .75rem; }
+.controls { margin-top: 1rem; gap: .75rem; }
+.filebtn { cursor: pointer; border: 1px solid var(--z700); background: var(--z900); padding: .375rem .75rem; font-weight: 600; color: var(--a200); border-radius: 4px; transition: border-color .15s; }
+.filebtn:hover, .filebtn:focus-within { border-color: rgba(217,119,6,.6); }
+.filebtn input { display: none; }
+header { position: relative; }
+h1 { padding-right: 8rem; }
+.themebtn { position: absolute; top: 1.5rem; right: 0; border: 1px solid var(--z700); background: var(--z900); padding: .25rem .625rem; font-size: .75rem; font-weight: 600; color: var(--z300); border-radius: 4px; white-space: nowrap; transition: border-color .15s, color .15s; }
+.themebtn:hover { color: var(--z100); border-color: rgba(217,119,6,.6); }
+.muted { color: var(--z500); }
+.warnmsg { color: var(--a300); }
+.err { color: var(--ro4); }
+.ghost { border: 1px solid var(--z700); padding: .25rem .5rem; color: var(--z400); border-radius: 4px; }
+.ghost:hover { color: var(--z200); }
+.field { display: flex; align-items: center; gap: .5rem; font-size: .75rem; color: var(--z400); }
+.field input, .field select, .search { border: 1px solid var(--z700); background: var(--z900); color: var(--z200); padding: .25rem .5rem; font-size: .75rem; border-radius: 4px; }
+.field input[type=number] { width: 6rem; }
+.budgetgroup { display: flex; flex-direction: column; gap: .375rem; align-items: flex-start; }
+.budgetgroup .lbl { min-width: 10.5rem; }
+.readout { border: 1px dashed var(--z700); border-radius: 4px; padding: .25rem .5rem; font-family: var(--mono); font-size: .75rem; color: var(--z200); min-width: 6rem; }
+.tabs { margin-left: auto; display: flex; gap: .25rem; border: 1px solid var(--z800); background: var(--z900); padding: .25rem; border-radius: 8px; }
+.tab { padding: .25rem .75rem; font-size: .75rem; font-weight: 600; color: var(--z400); border-radius: 4px; }
+.tab:hover { color: var(--z200); }
+.tab.on { background: rgba(251,191,36,.2); color: var(--a200); }
+
+/* generic blocks */
+section { margin-top: 1.5rem; display: grid; gap: 1rem; }
+.panel { border: 1px solid var(--z800); background: var(--panel-bg); border-radius: 8px; padding: 1rem; }
+.note { font-size: .75rem; line-height: 1.6; color: var(--z400); }
+.note b { font-weight: 600; color: var(--z300); }
+.note .hl { color: var(--a200); }
+.note code { color: var(--sky); }
+.list { border: 1px solid var(--z800); border-radius: 8px; overflow: hidden; }
+.list > * + * { border-top: 1px solid var(--row-line); }
+.rowbtn { display: flex; width: 100%; align-items: center; gap: .5rem; padding: .5rem .75rem; transition: background .15s; }
+.rowbtn:hover { background: var(--z900); }
+.grow { min-width: 0; flex: 1; }
+.trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mono { font-family: var(--mono); }
+
+/* badges */
+.prio { display: inline-block; border-radius: 4px; padding: .125rem .375rem; font-family: var(--mono); font-size: .75rem; font-weight: 600; }
+.pr-a { background: rgba(244,63,94,.15); color: var(--pr-a); border: 1px solid rgba(244,63,94,.3); }
+.pr-b { background: rgba(249,115,22,.15); color: var(--pr-b); border: 1px solid rgba(249,115,22,.3); }
+.pr-c { background: rgba(245,158,11,.15); color: var(--pr-c); border: 1px solid rgba(245,158,11,.3); }
+.pr-d { background: rgba(234,179,8,.1); color: var(--pr-d); border: 1px solid rgba(202,138,4,.3); }
+.pr-e { background: rgba(120,113,108,.15); color: var(--pr-e); border: 1px solid rgba(120,113,108,.3); }
+.bar { height: .5rem; width: 100%; overflow: hidden; border-radius: 999px; background: var(--z800); }
+.bar > i { display: block; height: 100%; border-radius: 999px; transition: width .2s; }
+.ok { background: var(--em5); } .warn { background: var(--a400); } .bad { background: var(--ro5); }
+.t-ok { color: var(--em4); } .t-warn { color: var(--a400); } .t-warn2 { color: var(--a300); } .t-bad { color: var(--ro4); }
+.prob { display: inline-flex; align-items: center; gap: .375rem; white-space: nowrap; font-size: .75rem; font-weight: 600; color: var(--a300); }
+.prob.t-ok { color: var(--em4); } .prob.t-bad { color: var(--ro4); }
+.prob .mini { display: inline-block; height: .375rem; width: 3rem; overflow: hidden; border-radius: 3px; background: var(--z800); }
+.prob .mini i { display: block; height: 100%; background: var(--a400); }
+.chip { border-radius: 4px; background: var(--chip-bg); padding: .125rem .375rem; font-family: var(--mono); font-size: .75rem; color: var(--sky); }
+.pill { border-radius: 4px; padding: .25rem .5rem; font-weight: 600; }
+.pill.g { background: rgba(16,185,129,.15); color: var(--em3); }
+.pill.a { background: rgba(245,158,11,.15); color: var(--a300); }
+.pill.r { background: rgba(244,63,94,.15); color: var(--ro3); }
+
+/* overview */
+.ov { display: flex; width: 100%; align-items: center; gap: .75rem; padding: .75rem 1rem; transition: background .15s; }
+.ov:hover { background: var(--z900); }
+.ov .num { width: 2rem; flex-shrink: 0; font-family: var(--mono); font-size: .75rem; color: var(--z600); }
+.ov .ttl { font-size: .875rem; color: var(--z200); }
+.ov .tst { font-size: .75rem; color: var(--z500); }
+.ov .meter { width: 14rem; flex-shrink: 0; }
+.ov .meter .l { display: flex; justify-content: space-between; margin-bottom: .25rem; font-size: .75rem; color: var(--z400); }
+.ov .stat { display: flex; flex-direction: column; align-items: flex-end; gap: .25rem; flex-shrink: 0; font-size: .75rem; }
+
+/* scenes */
+.pick { display: flex; flex-wrap: wrap; gap: .375rem; }
+.pick button { border: 1px solid var(--z800); background: var(--z900); padding: .25rem .625rem; font-size: .75rem; color: var(--z400); border-radius: 4px; }
+.pick button:hover { color: var(--z200); }
+.pick button.on { border-color: rgba(245,158,11,.5); background: rgba(251,191,36,.15); color: var(--a200); }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .75rem; }
+.head .id { font-family: var(--mono); font-size: .75rem; color: var(--z500); }
+.head h2 { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--a100); }
+.head .len { font-size: .75rem; color: var(--z500); }
+.trio { margin-top: .75rem; display: grid; gap: .75rem; font-size: .75rem; grid-template-columns: repeat(3, 1fr); }
+.trio > div { border: 1px solid var(--z800); background: var(--z900); padding: .75rem; border-radius: 4px; }
+.trio b { font-weight: 600; color: var(--z400); }
+.trio p { margin: .25rem 0 0; color: var(--z300); }
+.stats { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem; font-size: .75rem; color: var(--z400); }
+.stats .big { font-size: 1.125rem; font-weight: 700; color: var(--z100); }
+.stats .mid { font-weight: 600; color: var(--z200); }
+.meterrow { margin-top: .5rem; display: flex; align-items: center; gap: .75rem; }
+.meterrow .bar { flex: 1; }
+.meterrow span { white-space: nowrap; font-size: .75rem; color: var(--z400); }
+.sechead { margin-bottom: .5rem; display: flex; align-items: center; justify-content: space-between; font-size: .75rem; color: var(--z500); }
+.sechead b { font-weight: 600; }
+.scroll { max-height: 20rem; overflow-y: auto; padding-right: .5rem; }
+.scene-text { margin: 0; white-space: pre-wrap; font-family: var(--serif); font-size: .875rem; line-height: 1.7; color: var(--z300); }
+mark { border-radius: 2px; background: rgba(251,191,36,.25); padding: 0 .125rem; color: var(--a100); }
+.thead { display: flex; align-items: center; gap: .5rem; border-bottom: 1px solid var(--z800); background: var(--z900); padding: .5rem .75rem; font-size: .75rem; font-weight: 600; color: var(--z500); }
+.c-prio { width: 3rem; flex-shrink: 0; }
+.entryhead .c-prio { width: 2.5rem; }
+.sortbtn.left { text-align: left; }
+.sortbtn.right { text-align: right; }
+.usedin { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; font-size: .75rem; }
+.usedin .lbl { color: var(--z500); margin-right: .125rem; }
+.scenelink { display: inline-flex; align-items: center; gap: .375rem; border: 1px solid var(--z800); background: var(--z900); padding: .1875rem .5rem; border-radius: 4px; font-size: .75rem; color: var(--z300); max-width: 100%; }
+.scenelink:hover { color: var(--z100); border-color: rgba(217,119,6,.6); }
+.scenelink .n { font-family: var(--mono); color: var(--z500); }
+.scenelink .t { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-chars { width: 3.5rem; flex-shrink: 0; font-family: var(--mono); font-size: .75rem; color: var(--z500); }
+.c-keys { display: flex; align-items: center; justify-content: flex-end; gap: .25rem; flex-shrink: 0; width: 17rem; overflow: hidden; }
+.c-in { width: 6rem; flex-shrink: 0; display: flex; justify-content: flex-end; }
+.thead .c-in { text-align: right; }
+.entry-name { font-size: .875rem; color: var(--z200); }
+.detail { display: grid; gap: .5rem; border-top: 1px solid var(--row-line); background: var(--z950); padding: .75rem; }
+.keys { display: flex; flex-wrap: wrap; gap: .25rem; }
+.detail pre { margin: 0; white-space: pre-wrap; font-family: var(--serif); font-size: .75rem; line-height: 1.7; color: var(--z400); }
+details.panel summary { cursor: pointer; font-size: .75rem; font-weight: 600; color: var(--z400); }
+details.panel pre { margin: .75rem 0 0; max-height: 24rem; overflow-y: auto; white-space: pre-wrap; border-radius: 4px; background: var(--z950); padding: .75rem; font-family: var(--mono); font-size: .75rem; line-height: 1.6; color: var(--z400); }
+
+/* lorebook */
+.search { width: 16rem; max-width: 100%; padding: .375rem .75rem; font-size: .875rem; }
+.search::placeholder { color: var(--z600); }
+.filters { display: flex; flex-wrap: wrap; gap: .25rem; }
+.filters button { border-radius: 4px; background: var(--z900); padding: .25rem .5rem; font-size: .75rem; font-weight: 600; color: var(--z400); }
+.filters button:hover { color: var(--z200); }
+.filters button.on { background: rgba(251,191,36,.2); color: var(--a200); }
+.filters button.m { font-family: var(--mono); }
+.count { margin-left: auto; font-size: .75rem; color: var(--z500); }
+.entryrow { gap: .75rem; }
+.c-stat { width: 4.25rem; flex-shrink: 0; text-align: center; font-family: var(--mono); font-size: .75rem; color: var(--z600); }
+.c-stat.v { font-weight: 600; }
+.c-stat.v.s-ok { color: var(--em4); } .c-stat.v.s-warn { color: var(--a300); } .c-stat.v.s-bad { color: var(--ro4); }
+.sortbtn { cursor: pointer; text-align: center; font: inherit; font-weight: 600; color: var(--z500); border-radius: 4px; padding: .125rem 0; }
+.sortbtn:hover { color: var(--z200); }
+.sortbtn.on { color: var(--a200); }
+.statfilters { display: flex; flex-wrap: wrap; gap: .5rem; }
+.statfilters select { padding: .1875rem .375rem; }
+.c-meta { width: 7.5rem; flex-shrink: 0; text-align: right; }
+.entryrow .c-prio { width: 2.5rem; }
+.more { padding: .5rem .75rem; text-align: center; font-size: .75rem; color: var(--z500); }
+
+@media (max-width: 760px) {
+  .ov .meter, .c-chars, .c-keys, .thead .hide-s, .c-meta { display: none; }
+  .trio { grid-template-columns: 1fr; }
+  .tabs { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button class="themebtn" id="themeBtn" type="button"></button>
+    <h1 id="title"></h1>
+    <p class="sub" id="subtitle"></p>
+    <p class="sub2">Deterministic replay of keyword matching and budget selection — the narration itself comes from the API target configured inside the app, which this bench does not need.</p>
+    <div class="row toolbar">
+      <label class="filebtn">Load lorebook (.json)
+        <input type="file" id="loreFile" accept=".json,application/json">
+      </label>
+      <label class="filebtn">Load test scenes (.md / .json)
+        <input type="file" id="sceneFile" accept=".md,.markdown,.txt,.json">
+      </label>
+      <span class="muted" id="loreInfo"></span>
+      <span class="muted" id="sceneInfo"></span>
+      <button class="ghost" id="resetBtn" hidden>Reset to embedded data</button>
+      <span class="err" id="fileError" role="alert"></span>
+      <span class="warnmsg" id="fileWarn" role="status"></span>
+    </div>
+    <div class="row controls">
+      <div class="budgetgroup">
+        <label class="field"><span class="lbl">Budget</span>
+          <input type="number" id="budget" min="100" max="1000000" step="100">
+          chars
+        </label>
+        <label class="field"><span class="lbl">Estimated token budget</span>
+          <output id="tokEst" class="readout" for="budget">—</output>
+          <span class="muted" id="tokNote"></span>
+        </label>
+      </div>
+      <label class="field">Simulated turns
+        <select id="sims">
+          <option value="50">50</option>
+          <option value="200" selected>200</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+        </select>
+      </label>
+      <button class="ghost" id="rerun" title="Run the random simulation again with the same settings">Re-run simulation</button>
+      <div class="tabs" id="tabs">
+        <button class="tab" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="scenes">Scenes</button>
+        <button class="tab" data-tab="entries">Lorebook</button>
+      </div>
+    </div>
+  </header>
+  <main id="main"></main>
+</div>
+
+<script id="lore-data" type="application/json">{"name": "Atheron", "description": "A land of magic, adventure and intrigue.", "character_budget": 8000, "entries": [{"name": "Atheron Magical Academy", "keys": ["academy", "magic academy", "magical academy", "academy*", "tuition", "student", "students", "semester*", "exam", "exams", "examination*", "first-year*", "first year*", "lecture*"], "content": "The Atheron Magical Academy is the premier institution for scholars and mages of the country. It is located within Queenshome, a five minute walk from The Citadel. Young mages come to study here from all over the nation.\n\nIt is fairly expensive to attend, but there are various scholarship options, all with a requirement of five to ten years civil service afterwards.\n\nThe Academy is one of the older institutions in Atheron, slightly younger than the Mage Corps but not as old as Queenshome itself. It was partly founded to give aspiring nobles a leg-up in being recruited for the Mage Corps, and for most of its history it admitted only nobles. A few generations ago, a King opened it to wealthy merchants and created the scholarship program, arguing that the merchant families' contributions would help fund the magical education of everyone.\n\nIt takes in roughly 80 new students each year, who enter at the age of 18, about half of them on scholarships. Most of its money comes from the nobles and merchants who pay for their stay. Paying students live in the Sphinx dormitory and scholarship students in the Pegasus dormitory.\n\nThe current headmaster is Giles Drechsler, a 60 years old scholar who is more interested in academic merit than titles or wealth.\n\nA scholarship lasts five years, if completed, and paying students can study longer for an extra fee. Meta-Magic is the most prestigious field of study, and entry to it is gated by an old tradition of tests.", "priority": 4}, {"name": "Headmaster Giles Drechsler", "keys": ["giles", "drechsler", "headmaster", "giles*", "drechsler*", "headmaster*"], "content": "Headmaster of the Atheron Magical Academy, Giles Drechsler (age 60) was born in Stonehill, but his magical aptitude and academical interests led him to the Academy at the age of 15 and he has stayed there ever since, studying and perfecting his craft. He was a prodigy, admitted at 15 as an exception to the usual age of entry of 18, and that talent is also why someone born in Stonehill was allowed to become Headmaster. He was made professor of Applied Magical Theory at the unprecedented young age of 25 and served as such for a decade before being offered the position as Headmaster.\n\nGiles is completely apolitical and evaluates students and faculty on their magical merits alone. He is the main contact person for Colonel Amara whenever the topic of new recruits for the Mage Corps comes up.\n\nHe would like everyone at the Academy to be there on merit alone, but he is smart enough to understand its financial situation. Paying students, whether merchants or nobles, are not thrown out for poor performance, while scholarship students can be.\n\nHe supports the tradition that gates the study of Meta-Magic purely by merit. He does not lord it over any noble, and will at most refer to tradition and point to the historical mishaps.", "priority": 3}, {"name": "Scholarship", "keys": ["scholarship", "scholarship student", "scholarships", "scholarship's", "scholarship’s", "stipend", "spending money", "pocket money"], "content": "The academy is very expensive to attend to, but a scholarship option exists for those who can not afford it. Scholarship students have to pass an entry exam, which is pass/fail and exists to prove that it would not be a waste to teach them, so that as many skilled mages as possible graduate. The scholarship covers five years of study, if completed, and pays a stipend of two shillings a month, presented as money the Academy would otherwise have spent on feeding them. After graduating they have to perform five to ten years of civil service at minimum wage.\n\nUnlike paying students, scholarship students can be thrown out of the Academy for poor performance. They are then sent directly into the civil service with whatever skills they have at that point. Students who fail to graduate still have to perform their civil service.\n\nAbout half of the yearly intake of roughly 80 students are scholarship students. The scholarship program was created by a King a few generations ago. It is financed by the Academy, with the fees of the paying students covering the running costs, while the crown paid for the Pegasus dormitory. Scholarship students live in the Pegasus dormitory.", "priority": 5}, {"name": "Academy Dormitories", "keys": ["dormitor*", "dorm", "dorms", "sphinx dormitory", "pegasus dormitory", "pegasus", "sphinx", "roommate*", "dorm room*"], "content": "The Atheron Magical Academy has two dormitories.\n\nThe Sphinx dormitory was built when the Academy was founded. For most of the Academy's history only nobles studied there, and they needed somewhere to live that reflected their status, so its rooms come in grades of luxury. Paying students, mostly nobles and the children of wealthy merchants, live here. Even the rooms for lesser lords and ladies and wealthy merchants are far beyond what scholarship students get, and the most expensive rooms are out of reach even for the wealthiest merchant families, unless they are willing to risk bankruptcy.\n\nThe Pegasus dormitory was built when the scholarship program was created, and the crown paid for it, since the King at the time was the one who created the program. It is simple in construction but not small, with floors and rooms laid out to fit as many students as possible without completely sacrificing their ability to study. Each scholarship student gets a small room with only the basic necessities: a bed, a table, a chair and a chest for personal belongings and clothes.", "priority": 5}, {"name": "Professor Ethel Grau", "keys": ["ethel grau", "professor grau", "ethel grau's", "ethel grau’s", "professor grau's", "professor grau’s", "professor of conjuration", "conjuration professor"], "content": "Professor Ethel Grau (age 40, female) teaches Conjuration at the Atheron Magical Academy. Precise and dry-humoured, she has no tolerance for sloppiness, since what is summoned cannot always be sent back. She is patient with first-years but firm about safety rules, and sharper with advanced students. She does not discuss an old incident from her past.", "priority": 2}]}</script>
+<script id="scenes-data" type="application/json">[{"id": "scene1", "title": "First-years gather in the Academy's great hall", "setting": "Atheron Magical Academy, great hall, start of term", "tests": "Academy entries, dormitories/scholarship, a named professor greeting the player, noble surnames from established houses, commoner vs paying student.", "cast": "Professor Ethel Grau; nobles Rosalind Fairbanks (House Fairbanks) and Lorenz Ravensdale (House Ravensdale); commoners Marta (scholarship, Weidenfurt) and Teodor Kessler (merchant's son).", "declaredLength": 1255, "text": "The great hall of the Atheron Magical Academy is loud with eighty first-years finding their feet. Light falls in long bars through the tall windows, and the tables are crowded with trunks and nervous chatter.\n\nNear the door, Rosalind Fairbanks stands in a coat trimmed with scarlet, telling anyone who will listen that her mother's house has sent students here for generations. Beside her, Lorenz Ravensdale nods along, more interested in the ceiling than the conversation. Farther down, Marta, a miller's daughter from Weidenfurt, clutches her scholarship letter as if it might vanish, while Teodor Kessler, a cloth merchant's son, tries to look as though he has done this before.\n\nAs you step inside, a lean woman with ink on her cuffs detaches herself from the crowd and crosses the floor. \"Professor Ethel Grau,\" she says, with a dry half-smile. \"Conjuration, which you will learn to respect. You are early, which I approve of. Name, please. I have you down for Sphinx or Pegasus, and I would rather not guess which.\" She taps a ledger against her palm. \"Headmaster Drechsler speaks at noon, and rooms are sorted after. Until then, try not to summon anything.\"\n\nAround you, the chatter dips as heads turn to see whom the professor has chosen to greet."}]</script>
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LOREBOOK ENGINE — plain-JavaScript port of the lorebook layer of
+   "The Woven Fate" (v4.8-dynamic). Source functions: normalizeLorebook,
+   loreNorm, loreKeyRegex, entryMatches, loreSelect (shuffle within priority,
+   skip when over budget).
+
+   • Scan text = last 4 chat messages + the incoming player input. Each scene
+     here is scanned alone, as the first turn of a fresh conversation.
+   • A key matches as a whole word/phrase; "*" matches any word characters;
+     curly single quotes are normalised to straight ones first.
+   • Matched entries are tried priority 1 → 10 (so p1 wins budget contention),
+     in random order within a priority. An entry that does not fit the
+     remaining budget is skipped; later entries are still tried.
+   • The budget counts CONTENT characters only — the "[Name]" labels that the
+     app prepends when assembling the context are free.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const LORE_DEFAULT_BUDGET = 8000;
+
+function loreNorm(t) {
+  return String(t).toLowerCase().replace(/[\u2018\u2019]/g, "'");
+}
+
+function loreKeyRegex(key, flags) {
+  const parts = loreNorm(key).split("*").map(x => x.replace(/[.+?^${}()|[\]\\]/g, "\\$&"));
+  return new RegExp("(^|[^\\p{L}\\p{N}])" + parts.join("[\\p{L}\\p{N}_]*") + "(?![\\p{L}\\p{N}])", flags || "u");
+}
+
+/* ── Safety layer ─────────────────────────────────────────────────────────
+   Loaded files are untrusted. Everything below exists so that a hostile or
+   merely broken file can only produce an error message, not a frozen tab:
+   • size / count / length limits on every field that feeds the engine
+   • JSON is depth-checked before parsing, and "__proto__" / "constructor" /
+     "prototype" keys are discarded while parsing
+   • lorebook keys are the only user text compiled into a RegExp. Literal
+     characters are escaped; "*" is the only operator, limited to 2 per key
+     (consecutive stars collapsed), so matching cost stays polynomially
+     bounded. Scene text may not contain a single word longer than 100
+     characters, which bounds how much a wildcard can ever scan.
+   • control characters and bidi-override characters are stripped
+   • the (total keys × total scene characters) workload is capped          */
+
+const LIMITS = {
+  loreFileBytes: 5 * 1024 * 1024,
+  sceneFileBytes: 2 * 1024 * 1024,
+  jsonDepth: 16,
+  entries: 1500,
+  totalKeys: 25000,
+  keysPerEntry: 100,
+  keyLen: 100,
+  wildcardsPerKey: 2,
+  nameLen: 200,
+  descLen: 1000,
+  contentLen: 20000,
+  budgetMax: 1000000,
+  scenes: 100,
+  sceneText: 20000,
+  totalSceneText: 400000,
+  sceneField: 2000,
+  wordRun: 100,
+  mdLines: 50000,
+  workload: 4e8,          /* total keys x total scene characters */
+};
+
+const CTRL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+const WORD_RUN_RE = new RegExp("[\\p{L}\\p{N}_]{" + (LIMITS.wordRun + 1) + ",}", "u");
+
+/* Plain dictionary with no prototype, so entry names like "__proto__" are inert. */
+const dict = () => Object.create(null);
+
+function makeWarn() {
+  const m = new Map();
+  return {
+    add(msg, n) { m.set(msg, (m.get(msg) || 0) + (n === undefined ? 1 : n)); },
+    list() { return Array.from(m, ([msg, n]) => n + " " + msg); },
+  };
+}
+
+/* Control/bidi characters removed; non-strings become "". */
+function cleanStr(v, max) {
+  if (typeof v !== "string") return "";
+  const t = v.replace(CTRL_RE, "");
+  return t.length > max ? t.slice(0, max) : t;
+}
+
+/* Reject overly deep nesting before the parser sees it (the scan is iterative,
+   so it cannot overflow the stack), then parse with a reviver that discards
+   prototype-poisoning keys. */
+function safeJsonParse(text, maxBytes) {
+  if (text.length > maxBytes) throw new Error("file is too large (limit " + Math.round(maxBytes / 1048576) + " MB)");
+  let depth = 0, inStr = false, escp = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (inStr) {
+      if (escp) escp = false;
+      else if (c === 92) escp = true;
+      else if (c === 34) inStr = false;
+    } else if (c === 34) inStr = true;
+    else if (c === 123 || c === 91) { if (++depth > LIMITS.jsonDepth) throw new Error("JSON is nested too deeply (limit " + LIMITS.jsonDepth + " levels)"); }
+    else if (c === 125 || c === 93) depth--;
+  }
+  return JSON.parse(text, function (k, v) {
+    return (k === "__proto__" || k === "constructor" || k === "prototype") ? undefined : v;
+  });
+}
+
+/* Returns a cleaned key, or null if it is dropped (the reason goes into warn). */
+function sanitizeKey(k, warn) {
+  if (typeof k === "number") k = String(k);
+  if (typeof k !== "string") { warn.add("non-text keys dropped"); return null; }
+  let key = k.replace(CTRL_RE, "").trim();
+  if (!key) return null;
+  if (key.length > LIMITS.keyLen) { warn.add("over-long keys dropped (limit " + LIMITS.keyLen + " chars)"); return null; }
+  key = key.replace(/\*+/g, "*");
+  if ((key.match(/\*/g) || []).length > LIMITS.wildcardsPerKey) { warn.add("keys with more than " + LIMITS.wildcardsPerKey + " wildcards dropped"); return null; }
+  if (!key.replace(/\*/g, "").trim()) { warn.add("wildcard-only keys dropped"); return null; }
+  return key;
+}
+
+function normalizeLorebook(d, warn) {
+  warn = warn || makeWarn();
+  if (!d || typeof d !== "object" || !Array.isArray(d.entries)) throw new Error('No "entries" array found in lorebook file.');
+  if (d.entries.length > LIMITS.entries) throw new Error("too many entries (" + d.entries.length + "; limit " + LIMITS.entries + ")");
+  const entries = [];
+  const names = dict();
+  let totalKeys = 0;
+  d.entries.forEach((e, idx) => {
+    if (!e || typeof e !== "object" || Array.isArray(e)) { warn.add("malformed entries skipped"); return; }
+    const rawKeys = Array.isArray(e.keys) ? e.keys : [];
+    if (rawKeys.length > LIMITS.keysPerEntry) warn.add("keys beyond the per-entry limit ignored", rawKeys.length - LIMITS.keysPerEntry);
+    const keys = [], seenKeys = dict();
+    for (const k of rawKeys.slice(0, LIMITS.keysPerEntry)) {
+      const key = sanitizeKey(k, warn);
+      if (key && !seenKeys[key]) { seenKeys[key] = true; keys.push(key); }
+    }
+    const content = typeof e.content === "string" ? e.content.replace(CTRL_RE, "").trim() : "";
+    if (content.length > LIMITS.contentLen) throw new Error("entry #" + (idx + 1) + " has over-long content (" + content.length + " chars; limit " + LIMITS.contentLen + ")");
+    if (!content || !keys.length) return;
+    totalKeys += keys.length;
+    if (totalKeys > LIMITS.totalKeys) throw new Error("too many keys in total (limit " + LIMITS.totalKeys + ")");
+    /* names are used as lookup keys throughout the UI, so they must be unique */
+    let name = cleanStr(e.name, LIMITS.nameLen).trim() || "Untitled";
+    if (names[name]) {
+      let n = 2;
+      while (names[name + " (" + n + ")"]) n++;
+      name = name + " (" + n + ")";
+      warn.add("duplicate entry names renamed");
+    }
+    names[name] = true;
+    const pr = Math.round(Number(e.priority));
+    entries.push({ name, keys, content, priority: Math.min(10, Math.max(1, pr || 5)) });
+  });
+  if (!entries.length) throw new Error("no usable entries — each entry needs keys and content");
+  const b = Number(d.character_budget);
+  const fb = b > 0 ? Math.min(Math.floor(b), LIMITS.budgetMax) : LORE_DEFAULT_BUDGET;
+  return {
+    name: cleanStr(d.name, LIMITS.nameLen).trim() || "Lorebook",
+    description: cleanStr(d.description, LIMITS.descLen),
+    character_budget: fb,
+    entries,
+  };
+}
+
+function countKeys(book) { return book.entries.reduce((n, e) => n + e.keys.length, 0); }
+function countSceneChars(scenes) { return scenes.reduce((n, s) => n + s.text.length, 0); }
+function checkWorkload(book, scenes) {
+  if (countKeys(book) * countSceneChars(scenes) > LIMITS.workload)
+    throw new Error("this lorebook/scene combination is too large to analyse safely (" + countKeys(book) + " keys × " + countSceneChars(scenes) + " scene characters)");
+}
+
+const BOOK = normalizeLorebook(safeJsonParse(document.getElementById("lore-data").textContent, LIMITS.loreFileBytes));
+let SCENES = null; /* set below, once the scene normaliser is defined */
+
+/* ── File loading ───────────────────────────────────────────────────────── */
+
+function readText(file, maxBytes, extPattern, kind) {
+  return new Promise((resolve, reject) => {
+    const name = String(file.name || "");
+    if (name.length > 255 || !extPattern.test(name)) { reject(new Error("unexpected file type for " + kind)); return; }
+    if (file.size > maxBytes) { reject(new Error("file is too large (" + (file.size / 1048576).toFixed(1) + " MB; limit " + Math.round(maxBytes / 1048576) + " MB)")); return; }
+    const fr = new FileReader();
+    fr.onload = () => {
+      const t = String(fr.result || "");
+      if (t.length > maxBytes) { reject(new Error("file is too large")); return; }
+      if (t.indexOf("\u0000") >= 0) { reject(new Error("file looks like binary data, not text")); return; }
+      resolve(t);
+    };
+    fr.onerror = () => reject(new Error("could not read the file"));
+    fr.readAsText(file);
+  });
+}
+
+/* Parses the "Atheron test scenes" markdown format: '## sceneN: Title' headers,
+   *Setting:* / *Tests:* / *Cast:* / *Length:* fields, and blockquote (>) lines
+   as the scene text. */
+function parseScenesMd(raw, warn) {
+  const lines = raw.replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n");
+  if (lines.length > LIMITS.mdLines) throw new Error("too many lines (limit " + LIMITS.mdLines + ")");
+  const out = [];
+  let cur = null;
+  for (const line of lines) {
+    const hdr = line.match(/^## (scene[0-9]+):\s*(.*)$/);
+    if (hdr) {
+      if (cur) out.push(cur);
+      cur = { id: hdr[1], title: hdr[2].trim(), setting: "", tests: "", cast: "", declaredLength: 0, textLines: [] };
+      continue;
+    }
+    if (!cur) continue;
+    if (line.startsWith(">")) { cur.textLines.push(line.replace(/^> ?/, "")); continue; }
+    let mm;
+    if ((mm = line.match(/^\*Setting:\*\s*(.*)$/))) { cur.setting = mm[1].trim(); continue; }
+    if ((mm = line.match(/^\*Tests:\*\s*(.*)$/))) { cur.tests = mm[1].trim(); continue; }
+    if ((mm = line.match(/^\*Cast:\*\s*(.*)$/))) { cur.cast = mm[1].trim(); continue; }
+    if ((mm = line.match(/^\*Length:\*\s*([0-9]+)/))) { cur.declaredLength = parseInt(mm[1], 10); continue; }
+  }
+  if (cur) out.push(cur);
+  for (const s of out) s.text = s.textLines.join("\n");
+  const withText = out.filter(s => s.text.trim().length > 0);
+  if (!withText.length) throw new Error("no scenes found — expected '## sceneN:' headers with blockquote text");
+  return finishScenes(withText, warn);
+}
+
+/* Alternatively accepts a JSON array of scenes ({id, title, text, setting, tests, cast}). */
+function normalizeScenesJson(arr, warn) {
+  if (!Array.isArray(arr)) throw new Error("expected a JSON array of scenes");
+  if (arr.length > LIMITS.scenes) throw new Error("too many scenes (" + arr.length + "; limit " + LIMITS.scenes + ")");
+  const list = [];
+  arr.forEach(s => {
+    if (!s || typeof s !== "object" || Array.isArray(s)) return;
+    const text = typeof s.text === "string" ? s.text
+      : (Array.isArray(s.textLines) ? s.textLines.filter(x => typeof x === "string").join("\n") : "");
+    list.push({ id: s.id !== undefined ? s.id : s.name, title: s.title, setting: s.setting, tests: s.tests, cast: s.cast, declaredLength: s.declaredLength, text });
+  });
+  return finishScenes(list, warn);
+}
+
+/* Shared by the markdown and JSON paths: type checks, cleaning, limits. */
+function finishScenes(list, warn) {
+  warn = warn || makeWarn();
+  if (list.length > LIMITS.scenes) throw new Error("too many scenes (" + list.length + "; limit " + LIMITS.scenes + ")");
+  const out = [];
+  let total = 0;
+  list.forEach((s, i) => {
+    const text = typeof s.text === "string" ? s.text.replace(CTRL_RE, "") : "";
+    if (!text.trim()) return;
+    const id = cleanStr(typeof s.id === "number" ? String(s.id) : s.id, 100).trim() || "scene" + (i + 1);
+    if (text.length > LIMITS.sceneText) throw new Error('scene "' + id + '" is too long (' + text.length + " chars; limit " + LIMITS.sceneText + ")");
+    if (WORD_RUN_RE.test(loreNorm(text))) throw new Error('scene "' + id + '" contains a single word longer than ' + LIMITS.wordRun + " characters");
+    total += text.length;
+    if (total > LIMITS.totalSceneText) throw new Error("scenes are too long in total (limit " + LIMITS.totalSceneText + " characters)");
+    const dl = Number(s.declaredLength);
+    out.push({
+      id,
+      title: cleanStr(s.title, LIMITS.sceneField).trim() || "Scene " + (i + 1),
+      setting: cleanStr(s.setting, LIMITS.sceneField),
+      tests: cleanStr(s.tests, LIMITS.sceneField),
+      cast: cleanStr(s.cast, LIMITS.sceneField),
+      declaredLength: isFinite(dl) && dl > 0 ? Math.min(Math.floor(dl), 1e6) : 0,
+      text,
+    });
+  });
+  if (!out.length) throw new Error("no usable scenes — a JSON array needs a 'text' (or 'textLines') field per scene");
+  return out;
+}
+
+SCENES = normalizeScenesJson(safeJsonParse(document.getElementById("scenes-data").textContent, LIMITS.sceneFileBytes));
+
+/* ── Engine core ────────────────────────────────────────────────────────── */
+
+const rxCache = new Map();
+function keyRx(key) {
+  const cached = rxCache.get(key);
+  if (cached !== undefined) return cached;
+  let r = null;
+  try { r = loreKeyRegex(key); } catch (err) { r = null; }
+  rxCache.set(key, r);
+  return r;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+
+/* One loreSelect run over the matched entries of a scene. */
+function selectOnce(matched, budget) {
+  let remaining = budget;
+  const added = [];
+  for (let pr = 1; pr <= 10 && remaining > 0; pr++) {
+    for (const e of shuffle(matched.filter(x => x.priority === pr))) {
+      if (e.content.length <= remaining) { added.push(e); remaining -= e.content.length; }
+    }
+  }
+  return { added, used: budget - remaining };
+}
+
+/* ── Per-scene analysis ─────────────────────────────────────────────────── */
+
+function matchScene(scene, entries) {
+  const norm = loreNorm(scene.text);
+  const hits = [];
+  const raw = [];
+  for (const e of entries) {
+    const hitKeys = [];
+    for (const k of e.keys) {
+      const r = keyRx(k);
+      if (!r) continue;
+      let ok = false;
+      try { ok = r.test(norm); } catch (err) { ok = false; }
+      if (!ok) continue;
+      hitKeys.push(k);
+      /* locate the match for highlighting. loreNorm is length-preserving for
+         these texts, so indices in the normalised text are valid in the original. */
+      let re = null;
+      try { re = loreKeyRegex(k, "gu"); } catch (err) { re = null; }
+      if (!re) continue;
+      let m = re.exec(norm);
+      let guard = 0;
+      while (m !== null && guard < 30) {
+        guard++;
+        const lead = m[1] ? m[1].length : 0;
+        const s = m.index + lead;
+        const en = m.index + m[0].length;
+        if (en > s) raw.push({ s, e: en, keys: [k] });
+        if (re.lastIndex === m.index) re.lastIndex++;
+        m = re.exec(norm);
+      }
+    }
+    if (hitKeys.length) hits.push({ e, hitKeys });
+  }
+  raw.sort((a, b) => a.s - b.s || a.e - b.e);
+  const ranges = [];
+  for (const r of raw) {
+    const last = ranges[ranges.length - 1];
+    if (last && r.s <= last.e) {
+      if (r.e > last.e) last.e = r.e;
+      for (const k of r.keys) if (last.keys.indexOf(k) < 0) last.keys.push(k);
+    } else {
+      ranges.push({ s: r.s, e: r.e, keys: r.keys.slice() });
+    }
+  }
+  return { hits, ranges };
+}
+
+function simulate(hits, budget, sims) {
+  const matched = hits.map(h => h.e);
+  const total = matched.reduce((s, e) => s + e.content.length, 0);
+  const fitsAll = total <= budget;
+  const runs = fitsAll ? Math.max(1, Math.min(3, sims)) : sims;
+  const counts = new Map();
+  const usedArr = [];
+  const addedArr = [];
+  let example = [];
+  for (let i = 0; i < runs; i++) {
+    const r = selectOnce(matched, budget);
+    usedArr.push(r.used);
+    addedArr.push(r.added.length);
+    for (const e of r.added) counts.set(e.name, (counts.get(e.name) || 0) + 1);
+    if (i === Math.floor(runs / 2)) example = r.added;
+  }
+  const probs = new Map();
+  for (const e of matched) probs.set(e.name, (counts.get(e.name) || 0) / runs);
+  usedArr.sort((a, b) => a - b);
+  addedArr.sort((a, b) => a - b);
+  const mid = arr => arr[Math.floor((arr.length - 1) / 2)];
+  return {
+    total,
+    fitsAll,
+    probs,
+    usedMedian: mid(usedArr),
+    usedMin: usedArr[0],
+    usedMax: usedArr[usedArr.length - 1],
+    addedMedian: mid(addedArr),
+    addedMin: addedArr[0],
+    addedMax: addedArr[addedArr.length - 1],
+    exampleCtx: example.map(e => "[" + e.name + "] " + e.content).join("\n\n"),
+  };
+}
+
+/* ── State ──────────────────────────────────────────────────────────────── */
+
+const state = {
+  tab: "overview",
+  sel: 0,
+  budget: BOOK.character_budget,
+  sims: 200,
+  openScene: dict(),
+  openEntry: dict(),
+  ctxOpen: false,
+  search: "",
+  prioFilter: 0,
+  sortKey: null,
+  sortDir: "desc",
+  statFilter: { fit: "any", contested: "any", never: "any" },
+  book: BOOK,
+  scenes: SCENES,
+  customLore: false,
+  customScenes: false,
+  fileError: null,
+  fileWarn: [],
+};
+
+let matchesCache = null;
+let resultsCache = null;
+function getMatches() {
+  if (!matchesCache) matchesCache = state.scenes.map(s => matchScene(s, state.book.entries));
+  return matchesCache;
+}
+function getResults() {
+  if (!resultsCache) resultsCache = getMatches().map(m => simulate(m.hits, state.budget, state.sims));
+  return resultsCache;
+}
+function invalidateMatches() { matchesCache = null; resultsCache = null; }
+function invalidateResults() { resultsCache = null; }
+
+/* ── View helpers ───────────────────────────────────────────────────────── */
+
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function prioClass(p) {
+  if (p <= 2) return "pr-a";
+  if (p <= 4) return "pr-b";
+  if (p <= 6) return "pr-c";
+  if (p <= 8) return "pr-d";
+  return "pr-e";
+}
+const prioBadge = p => '<span class="prio ' + prioClass(p) + '">p' + p + "</span>";
+
+function budgetBar(used, budget) {
+  const pct = budget > 0 ? Math.min(100, (used / budget) * 100) : 0;
+  const color = pct > 95 ? "bad" : pct > 70 ? "warn" : "ok";
+  return '<div class="bar"><i class="' + color + '" style="width:' + pct + '%"></i></div>';
+}
+
+function probBadge(p) {
+  if (p >= 0.995) return '<span class="prob t-ok">always in</span>';
+  if (p <= 0.005) return '<span class="prob t-bad">never fits</span>';
+  const pct = Math.round(p * 100);
+  return '<span class="prob"><span class="mini"><i style="width:' + pct + '%"></i></span><span>' + pct + "%</span></span>";
+}
+
+const keyChip = k => '<code class="chip">' + esc(k) + "</code>";
+
+function highlightedText(text, ranges) {
+  let html = "";
+  let pos = 0;
+  for (const r of ranges) {
+    if (r.s > pos) html += esc(text.slice(pos, r.s));
+    html += '<mark title="' + esc(r.keys.join(", ")) + '">' + esc(text.slice(r.s, r.e)) + "</mark>";
+    pos = r.e;
+  }
+  if (pos < text.length) html += esc(text.slice(pos));
+  return '<p class="scene-text">' + html + "</p>";
+}
+
+function isContested(p) { return p > 0.005 && p < 0.995; }
+
+/* ── Renderers ──────────────────────────────────────────────────────────── */
+
+function renderHeader() {
+  const book = state.book, scenes = state.scenes;
+  $("title").textContent = book.name + " · Lorebook Test Bench";
+  $("subtitle").innerHTML = scenes.length + " test scenes × " + book.entries.length +
+    " lorebook entries · faithful replay of the lorebook layer of <b>The Woven Fate</b> (v4.8-dynamic) · plain JavaScript";
+  $("loreInfo").textContent = book.name + " · " + book.entries.length + " entries · " + (state.customLore ? "custom" : "embedded");
+  $("sceneInfo").textContent = scenes.length + " scenes · " + (state.customScenes ? "custom" : "embedded");
+  $("resetBtn").hidden = !(state.customLore || state.customScenes);
+  $("fileError").textContent = state.fileError || "";
+  $("fileWarn").textContent = state.fileWarn.length ? "Loaded with adjustments: " + state.fileWarn.join("; ") : "";
+  if (document.activeElement !== $("budget")) $("budget").value = state.budget;
+  updateTokenEstimate(state.budget);
+  $("sims").value = String(state.sims);
+  document.querySelectorAll("#tabs .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === state.tab));
+}
+
+function renderOverview() {
+  const matches = getMatches(), results = getResults(), budget = state.budget;
+  const rows = state.scenes.map((s, i) => {
+    const mm = matches[i], rr = results[i];
+    const ct = mm.hits.filter(h => isContested(rr.probs.get(h.e.name) || 0)).length;
+    const nv = mm.hits.filter(h => (rr.probs.get(h.e.name) || 0) <= 0.005).length;
+    const pct = budget > 0 ? Math.round((rr.usedMedian / budget) * 100) : 0;
+    return '<button class="ov" data-action="goto-scene" data-i="' + i + '">' +
+      '<span class="num">' + (i + 1) + "</span>" +
+      '<div class="grow"><div class="ttl trunc">' + esc(s.title) + '</div><div class="tst trunc">' + esc(s.tests) + "</div></div>" +
+      '<div class="meter"><div class="l"><span>' + rr.addedMedian + " of " + mm.hits.length + " in</span><span>" + pct + "% of budget</span></div>" +
+      budgetBar(rr.usedMedian, budget) + "</div>" +
+      '<div class="stat">' +
+        '<span class="' + (rr.fitsAll ? "t-ok" : "t-warn") + '">' + (rr.fitsAll ? "all fit" : "+" + (rr.total - rr.usedMax) + " over") + "</span>" +
+        (ct > 0 ? '<span class="t-warn2">' + ct + " contested</span>" : "") +
+        (nv > 0 ? '<span class="t-bad">' + nv + " never in</span>" : "") +
+      "</div></button>";
+  }).join("");
+  return '<section>' +
+    '<div class="panel note"><b>How the engine picks entries.</b> The scene text is scanned with the last 4 chat messages ' +
+    "(here: none — each scene is a first turn). Keys match as whole words or phrases; <code>*</code> stands for any word characters; " +
+    'curly quotes are normalised. Matched entries are tried <span class="hl">priority 1 first, 10 last</span>, in random order within a priority — ' +
+    "so p1 entries win when the budget runs out. An entry that does not fit the remaining budget is skipped. The budget counts entry content only; " +
+    "the [Name] labels added to the final context are free. “Contested” entries show the share of simulated turns in which they made the cut.</div>" +
+    '<div class="list">' + rows + "</div></section>";
+}
+
+function renderScenes() {
+  const scenes = state.scenes, budget = state.budget;
+  const scene = scenes[state.sel], m = getMatches()[state.sel], r = getResults()[state.sel];
+  const sortedHits = [...m.hits].sort((a, b) =>
+    a.e.priority - b.e.priority ||
+    (r.probs.get(b.e.name) || 0) - (r.probs.get(a.e.name) || 0) ||
+    b.e.content.length - a.e.content.length
+  );
+  const contested = sortedHits.filter(h => isContested(r.probs.get(h.e.name) || 0)).length;
+  const neverIn = sortedHits.filter(h => (r.probs.get(h.e.name) || 0) <= 0.005).length;
+
+  const picker = scenes.map((s, i) =>
+    '<button data-action="sel" data-i="' + i + '" class="' + (i === state.sel ? "on" : "") + '" title="' + esc(s.title) + '">' + (i + 1) + "</button>"
+  ).join("");
+
+  const fitPill = r.fitsAll
+    ? '<span class="pill g">Everything fits the ' + budget + "-char budget — order never matters</span>"
+    : '<span class="pill a">Over budget by ' + (r.total - r.usedMax) + "–" + (r.total - r.usedMin) + " chars — priority order decides</span>";
+
+  const entryRows = sortedHits.map(h => {
+    const p = r.probs.get(h.e.name) || 0;
+    const open = !!state.openScene[h.e.name];
+    const keys = h.hitKeys.slice(0, 3).map(keyChip).join("") +
+      (h.hitKeys.length > 3 ? '<span class="muted" style="font-size:.75rem">+' + (h.hitKeys.length - 3) + "</span>" : "");
+    return "<div>" +
+      '<button class="rowbtn" data-action="toggle-scene" data-name="' + esc(h.e.name) + '" aria-expanded="' + open + '">' +
+        '<span class="c-prio">' + prioBadge(h.e.priority) + "</span>" +
+        '<span class="grow entry-name trunc">' + esc(h.e.name) + "</span>" +
+        '<span class="c-chars">' + h.e.content.length + "</span>" +
+        '<span class="c-keys">' + keys + "</span>" +
+        '<span class="c-in">' + probBadge(p) + "</span>" +
+      "</button>" +
+      (open ? '<div class="detail"><div class="keys">' + h.hitKeys.map(keyChip).join("") + "</div><pre>" + esc(h.e.content) + "</pre></div>" : "") +
+      "</div>";
+  }).join("");
+
+  return "<section>" +
+    '<div class="pick">' + picker + "</div>" +
+    '<div class="panel">' +
+      '<div class="head"><span class="id">' + esc(scene.id) + "</span><h2>" + esc(scene.title) + '</h2><span class="len">' + scene.declaredLength + " chars as written</span></div>" +
+      '<div class="trio">' +
+        "<div><b>Setting</b><p>" + esc(scene.setting) + "</p></div>" +
+        "<div><b>Tests</b><p>" + esc(scene.tests) + "</p></div>" +
+        "<div><b>Cast</b><p>" + esc(scene.cast) + "</p></div>" +
+      "</div>" +
+      '<div class="stats">' +
+        '<span>Triggered: <span class="big">' + m.hits.length + "</span></span>" +
+        '<span>In context (median): <span class="big">' + r.addedMedian + '</span> <span class="muted">(range ' + r.addedMin + "–" + r.addedMax + ")</span></span>" +
+        '<span>Matched content: <span class="mid">' + r.total + "</span> chars</span>" +
+        fitPill +
+        (contested > 0 ? '<span class="pill a">' + contested + " contested</span>" : "") +
+        (neverIn > 0 ? '<span class="pill r">' + neverIn + " never in</span>" : "") +
+      "</div>" +
+      '<div class="meterrow">' + budgetBar(r.usedMedian, budget) + "<span>" + r.usedMedian + " / " + budget + " chars (median; " + r.usedMin + "–" + r.usedMax + ")</span></div>" +
+    "</div>" +
+    '<div class="panel">' +
+      '<div class="sechead"><b>Scene text · highlighted = matched a key</b><span>' + m.ranges.length + " highlighted passages</span></div>" +
+      '<div class="scroll">' + highlightedText(scene.text, m.ranges) + "</div>" +
+    "</div>" +
+    '<div class="list">' +
+      '<div class="thead"><span class="c-prio">Prio</span><span class="grow">Entry</span><span class="c-chars">Chars</span><span class="c-keys hide-s">Matched keys</span><span class="c-in">In context</span></div>' +
+      "<div class=\"list\" style=\"border:0;border-radius:0\">" + entryRows + "</div>" +
+    "</div>" +
+    '<details class="panel" id="ctxDetails"' + (state.ctxOpen ? " open" : "") + "><summary>Assembled lore context from one simulated turn (" +
+      r.exampleCtx.length + " chars incl. [Name] labels)</summary><pre>" + esc(r.exampleCtx) + "</pre></details>" +
+  "</section>";
+}
+
+/* first-click direction per sort key, and human labels for the direction button */
+const SORT_DEFAULT_DIR = { prio: "asc", name: "asc", size: "desc", fit: "desc", contested: "desc", never: "desc" };
+const SORT_DIR_LABEL = {
+  prio: ["p1 \u2192 p10", "p10 \u2192 p1"], name: ["A \u2192 Z", "Z \u2192 A"], size: ["smallest first", "largest first"],
+  fit: ["fewest first", "most first"], contested: ["fewest first", "most first"], never: ["fewest first", "most first"],
+};
+function sortDirLabel() { return state.sortKey ? SORT_DIR_LABEL[state.sortKey][state.sortDir === "asc" ? 0 : 1] : "\u2014"; }
+
+function statPass(mode, n) {
+  return mode === "any" || (mode === "has" ? n > 0 : n === 0);
+}
+
+function filterEntries(stats) {
+  const q = state.search.trim().toLowerCase();
+  const sf = state.statFilter;
+  const zero = { fit: 0, contested: 0, never: 0 };
+  const list = state.book.entries.map((e, i) => ({ e, i, s: stats.get(e.name) || zero })).filter(x =>
+    (state.prioFilter === 0 || x.e.priority === state.prioFilter) &&
+    statPass(sf.fit, x.s.fit) && statPass(sf.contested, x.s.contested) && statPass(sf.never, x.s.never) &&
+    (!q || x.e.name.toLowerCase().indexOf(q) >= 0 || x.e.keys.some(k => k.toLowerCase().indexOf(q) >= 0) || x.e.content.toLowerCase().indexOf(q) >= 0)
+  );
+  if (state.sortKey) {
+    const dir = state.sortDir === "asc" ? 1 : -1, key = state.sortKey;
+    const cmp = key === "name" ? (a, b) => a.e.name.localeCompare(b.e.name, undefined, { numeric: true, sensitivity: "base" })
+      : key === "prio" ? (a, b) => a.e.priority - b.e.priority
+      : key === "size" ? (a, b) => a.e.content.length - b.e.content.length
+      : (a, b) => a.s[key] - b.s[key];               /* fit / contested / never */
+    list.sort((a, b) => cmp(a, b) * dir || a.i - b.i);   /* ties keep book order */
+  }
+  return list.map(x => x.e);
+}
+
+/* Per-entry tally across all loaded scenes:
+   fit       = triggered and always made the cut (never had to compete)
+   contested = triggered and made the cut only in some simulated turns
+   never     = triggered but never made the cut */
+function entryStats() {
+  const matches = getMatches(), results = getResults();
+  const st = new Map();
+  state.book.entries.forEach(e => st.set(e.name, { fit: 0, contested: 0, never: 0, scenes: [] }));
+  matches.forEach((m, i) => {
+    for (const h of m.hits) {
+      const s = st.get(h.e.name);
+      if (!s) continue;
+      const p = results[i].probs.get(h.e.name) || 0;
+      if (p >= 0.995) s.fit++;
+      else if (p <= 0.005) s.never++;
+      else s.contested++;
+      s.scenes.push({ i, p, keys: h.hitKeys });
+    }
+  });
+  return st;
+}
+
+/* Links to every loaded scene that triggers this entry, with how it fared there. */
+function usedInHtml(st) {
+  const total = state.scenes.length;
+  if (!st.scenes.length) return '<div class="usedin muted">Not triggered by any of the ' + total + " loaded scene" + (total === 1 ? "" : "s") + ".</div>";
+  return '<div class="usedin"><span class="lbl">Triggered in ' + st.scenes.length + " of " + total + " scene" + (total === 1 ? "" : "s") + ":</span>" +
+    st.scenes.map(x => {
+      const sc = state.scenes[x.i];
+      const cls = x.p >= 0.995 ? "g" : x.p <= 0.005 ? "r" : "a";
+      const txt = x.p >= 0.995 ? "in" : x.p <= 0.005 ? "never in" : Math.round(x.p * 100) + "% in";
+      const how = x.p >= 0.995 ? "made the cut in every simulated turn"
+        : x.p <= 0.005 ? "never made the cut" : "made the cut in " + Math.round(x.p * 100) + "% of simulated turns";
+      return '<button class="scenelink" data-action="goto-scene" data-i="' + x.i + '" title="' +
+        esc(sc.id + " \u2014 " + sc.title + " \u00b7 matched: " + x.keys.join(", ") + " \u00b7 " + how) + '">' +
+        '<span class="n">#' + (x.i + 1) + '</span><span class="t">' + esc(sc.title) + '</span><span class="pill ' + cls + '">' + txt + "</span></button>";
+    }).join("") + "</div>";
+}
+
+function statCell(n, cls, title) {
+  return '<span class="c-stat v ' + (n > 0 ? cls : "") + '" title="' + title + '">' + n + "</span>";
+}
+
+function renderEntryList() {
+  const stats = entryStats();
+  const filtered = filterEntries(stats);
+  const nScenes = state.scenes.length;
+  const sortBtn = (key, label, title, cls) =>
+    '<button class="sortbtn ' + cls + (state.sortKey === key ? " on" : "") + '" data-action="sort" data-col="' + key + '" title="' + title + ' (click to sort)">' +
+    label + (state.sortKey === key ? (state.sortDir === "asc" ? " \u25b2" : " \u25bc") : "") + "</button>";
+  const head = '<div class="thead entryhead">' +
+    sortBtn("prio", "Prio", "Priority (p1 wins budget contention)", "c-prio left") +
+    sortBtn("name", "Entry", "Entry name, alphabetically", "grow left") +
+    sortBtn("fit", "Fits", "Scenes where the entry was triggered and always made the cut", "c-stat") +
+    sortBtn("contested", "Contested", "Scenes where the entry was triggered but competed for budget (made the cut only in some simulated turns)", "c-stat") +
+    sortBtn("never", "Never in", "Scenes where the entry was triggered but never made the cut", "c-stat") +
+    sortBtn("size", "Size", "Entry content length in characters", "c-meta right hide-s") + "</div>";
+  const rows = filtered.slice(0, 120).map(e => {
+    const open = !!state.openEntry[e.name];
+    const s = stats.get(e.name) || { fit: 0, contested: 0, never: 0, scenes: [] };
+    return "<div>" +
+      '<button class="rowbtn entryrow" data-action="toggle-entry" data-name="' + esc(e.name) + '" aria-expanded="' + open + '">' +
+        '<span class="c-prio">' + prioBadge(e.priority) + "</span>" +
+        '<span class="grow entry-name trunc">' + esc(e.name) + "</span>" +
+        statCell(s.fit, "s-ok", "Triggered in " + s.fit + " of " + nScenes + " scenes and always fit") +
+        statCell(s.contested, "s-warn", "Triggered in " + s.contested + " of " + nScenes + " scenes where it competed with other entries for budget") +
+        statCell(s.never, "s-bad", "Triggered in " + s.never + " of " + nScenes + " scenes but never picked") +
+        '<span class="c-meta mono muted hide-s" style="font-size:.75rem">' + e.content.length + " ch \u00b7 " + e.keys.length + " keys</span>" +
+      "</button>" +
+      (open ? '<div class="detail"><div class="keys">' + e.keys.map(keyChip).join("") + "</div>" + usedInHtml(s) + "<pre>" + esc(e.content) + "</pre></div>" : "") +
+      "</div>";
+  }).join("");
+  const more = filtered.length > 120
+    ? '<div class="more">Refine the search to see the remaining ' + (filtered.length - 120) + " entries.</div>" : "";
+  $("entryCount").textContent = filtered.length + " of " + state.book.entries.length + " entries \u00b7 " + nScenes + " scenes";
+  $("entryList").innerHTML = head + (rows || '<div class="more">No entries match the current filters.</div>') + more;
+  const sk = $("sortKey"), sd = $("sortDir");
+  if (sk) sk.value = state.sortKey || "";
+  if (sd) { sd.disabled = !state.sortKey; sd.textContent = sortDirLabel(); }
+  const active = state.sortKey || state.search || state.prioFilter || Object.values(state.statFilter).some(v => v !== "any");
+  $("clearStat").hidden = !active;
+}
+
+function statSelect(col, label) {
+  const v = state.statFilter[col];
+  const opt = (val, txt) => '<option value="' + val + '"' + (v === val ? " selected" : "") + ">" + txt + "</option>";
+  return '<label class="field">' + label + ' <select data-action="statfilter" data-col="' + col + '">' +
+    opt("any", "any") + opt("has", "1 or more") + opt("none", "none") + "</select></label>";
+}
+
+function sortControlsHtml() {
+  const opt = (v, t) => '<option value="' + v + '"' + ((state.sortKey || "") === v ? " selected" : "") + ">" + t + "</option>";
+  return '<div class="statfilters"><label class="field">Sort by <select id="sortKey" data-action="sortselect">' +
+    opt("", "Book order") + opt("prio", "Priority") + opt("name", "Name") + opt("size", "Size") +
+    opt("fit", "Fits") + opt("contested", "Contested") + opt("never", "Never in") + "</select></label>" +
+    '<button class="ghost" id="sortDir" data-action="sortdir" title="Reverse the sort direction"' + (state.sortKey ? "" : " disabled") + ">" + sortDirLabel() + "</button></div>";
+}
+
+function renderEntries() {
+  const filters = '<button data-action="prio" data-p="0" class="' + (state.prioFilter === 0 ? "on" : "") + '">all</button>' +
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(p =>
+      '<button data-action="prio" data-p="' + p + '" class="m ' + (state.prioFilter === p ? "on" : "") + '">p' + p + "</button>").join("");
+  return "<section>" +
+    '<div class="row">' +
+      '<input class="search" id="search" type="search" placeholder="Search names, keys or content…" value="' + esc(state.search) + '" aria-label="Search lorebook">' +
+      '<div class="filters">' + filters + "</div>" +
+      '<div class="statfilters">' + statSelect("fit", "Fits") + statSelect("contested", "Contested") + statSelect("never", "Never in") + "</div>" +
+      sortControlsHtml() +
+      '<button class="ghost" id="clearStat" data-action="clearstat" hidden>Clear sort &amp; filters</button>' +
+      '<span class="count" id="entryCount"></span>' +
+    "</div>" +
+    '<div class="list" id="entryList"></div>' +
+  "</section>";
+}
+
+function render() {
+  renderHeader();
+  const main = $("main");
+  if (state.tab === "overview") main.innerHTML = renderOverview();
+  else if (state.tab === "scenes") {
+    main.innerHTML = renderScenes();
+    $("ctxDetails").addEventListener("toggle", ev => { state.ctxOpen = ev.target.open; });
+  } else {
+    main.innerHTML = renderEntries();
+    renderEntryList();
+    $("search").addEventListener("input", ev => { state.search = ev.target.value; renderEntryList(); });
+  }
+}
+
+/* ── Events ─────────────────────────────────────────────────────────────── */
+
+$("main").addEventListener("click", ev => {
+  const el = ev.target.closest("[data-action]");
+  if (!el) return;
+  const a = el.dataset.action;
+  if (a === "goto-scene") { state.sel = Number(el.dataset.i); state.tab = "scenes"; }
+  else if (a === "sel") state.sel = Number(el.dataset.i);
+  else if (a === "toggle-scene") state.openScene[el.dataset.name] = !state.openScene[el.dataset.name];
+  else if (a === "toggle-entry") state.openEntry[el.dataset.name] = !state.openEntry[el.dataset.name];
+  else if (a === "prio") state.prioFilter = Number(el.dataset.p);
+  else if (a === "sort") {
+    /* cycle: key's natural direction -> reversed -> back to book order */
+    const c = el.dataset.col;
+    if (!(c in SORT_DEFAULT_DIR)) return;
+    const def = SORT_DEFAULT_DIR[c];
+    if (state.sortKey !== c) { state.sortKey = c; state.sortDir = def; }
+    else if (state.sortDir === def) state.sortDir = def === "asc" ? "desc" : "asc";
+    else state.sortKey = null;
+  }
+  else if (a === "sortdir") { if (state.sortKey) state.sortDir = state.sortDir === "asc" ? "desc" : "asc"; }
+  else if (a === "clearstat") {
+    state.sortKey = null; state.search = ""; state.prioFilter = 0;
+    state.statFilter = { fit: "any", contested: "any", never: "any" };
+  }
+  if (a === "goto-scene") window.scrollTo(0, 0);
+  if (a === "prio") {
+    /* re-render only the filter highlight and list, keeping the search box focused state */
+    document.querySelectorAll('[data-action="prio"]').forEach(b => b.classList.toggle("on", Number(b.dataset.p) === state.prioFilter));
+    renderEntryList();
+    return;
+  }
+  if (a === "toggle-entry" || a === "sort" || a === "sortdir") { renderEntryList(); return; }
+  render();
+});
+
+$("main").addEventListener("change", ev => {
+  const sel = ev.target.closest('[data-action="sortselect"]');
+  if (sel) {
+    state.sortKey = sel.value in SORT_DEFAULT_DIR ? sel.value : null;
+    if (state.sortKey) state.sortDir = SORT_DEFAULT_DIR[state.sortKey];
+    renderEntryList();
+    return;
+  }
+  const el = ev.target.closest('[data-action="statfilter"]');
+  if (!el) return;
+  state.statFilter[el.dataset.col] = el.value;
+  renderEntryList();
+});
+
+$("tabs").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-tab]");
+  if (!b) return;
+  state.tab = b.dataset.tab;
+  render();
+});
+
+$("budget").addEventListener("input", ev => {
+  /* live preview while typing; the budget itself is applied on "change" */
+  updateTokenEstimate(ev.target.value === "" ? NaN : Number(ev.target.value));
+});
+
+$("budget").addEventListener("change", ev => {
+  state.budget = Math.min(LIMITS.budgetMax, Math.max(100, Math.floor(Number(ev.target.value) || 0)));
+  ev.target.value = state.budget;
+  invalidateResults();
+  render();
+});
+
+$("sims").addEventListener("change", ev => {
+  state.sims = Number(ev.target.value);
+  invalidateResults();
+  render();
+});
+
+$("rerun").addEventListener("click", () => { invalidateResults(); render(); });
+
+$("loreFile").addEventListener("change", async ev => {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  try {
+    const warn = makeWarn();
+    const raw = await readText(f, LIMITS.loreFileBytes, /\.json$/i, "a lorebook (expected .json)");
+    const nb = normalizeLorebook(safeJsonParse(raw, LIMITS.loreFileBytes), warn);
+    checkWorkload(nb, state.scenes);
+    state.book = nb;
+    state.budget = nb.character_budget;
+    state.customLore = true;
+    state.fileError = null;
+    state.fileWarn = warn.list();
+    state.openEntry = dict();
+    state.openScene = dict();
+    invalidateMatches();
+  } catch (err) {
+    state.fileError = "Lorebook rejected: " + (err && err.message ? err.message : "could not parse the file");
+  }
+  render();
+});
+
+$("sceneFile").addEventListener("change", async ev => {
+  const f = ev.target.files && ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  try {
+    const warn = makeWarn();
+    const raw = await readText(f, LIMITS.sceneFileBytes, /\.(md|markdown|txt|json)$/i, "scenes (expected .md, .txt or .json)");
+    const trimmed = raw.replace(/^\uFEFF/, "").trim();
+    let sc = null;
+    if (/\.json$/i.test(f.name) || trimmed.startsWith("[")) {
+      let arr = null;
+      try { arr = safeJsonParse(trimmed, LIMITS.sceneFileBytes); } catch (err) {
+        if (/\.json$/i.test(f.name)) throw err;   /* a .json file must be valid, safe JSON */
+      }
+      if (Array.isArray(arr)) sc = normalizeScenesJson(arr, warn);
+      else if (/\.json$/i.test(f.name)) throw new Error("expected a JSON array of scenes");
+    }
+    if (!sc) sc = parseScenesMd(raw, warn);
+    checkWorkload(state.book, sc);
+    state.scenes = sc;
+    state.sel = 0;
+    state.openScene = dict();
+    state.customScenes = true;
+    state.fileError = null;
+    state.fileWarn = warn.list();
+    invalidateMatches();
+  } catch (err) {
+    state.fileError = "Scenes rejected: " + (err && err.message ? err.message : "could not parse the file");
+  }
+  render();
+});
+
+$("resetBtn").addEventListener("click", () => {
+  state.book = BOOK;
+  state.scenes = SCENES;
+  state.budget = BOOK.character_budget;
+  state.customLore = false;
+  state.customScenes = false;
+  state.fileError = null;
+  state.fileWarn = [];
+  state.sel = 0;
+  state.openScene = dict();
+  state.openEntry = dict();
+  invalidateMatches();
+  render();
+});
+
+/* ── Estimated token budget ─────────────────────────────────────────────────
+   There is no tokenizer in the page, so this is a heuristic range, not a count.
+   Latin-style text averages roughly 3–4.5 characters per token; Chinese,
+   Japanese and Korean text is far denser (roughly 0.7–1.5 characters per
+   token). The loaded lorebook's own content is sampled (bounded) for its
+   share of CJK characters, and the two ranges are blended by that share.   */
+const CJK_RE = /[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff00-\uffef]/g;  /* incl. CJK punctuation + fullwidth forms */
+const CPT = { latin: [3.0, 4.5], cjk: [0.7, 1.5] };   /* chars per token: [densest, sparsest] */
+let tokProfile = { book: null, cjk: 0 };
+
+function cjkShare(book) {
+  if (tokProfile.book === book) return tokProfile.cjk;
+  let seen = 0, hits = 0;
+  for (const e of book.entries) {
+    if (seen >= 200000) break;                       /* bounded sample */
+    const t = e.content.slice(0, 2000);
+    seen += t.length;
+    const m = t.match(CJK_RE);
+    if (m) hits += m.length;
+  }
+  tokProfile = { book, cjk: seen ? hits / seen : 0 };
+  return tokProfile.cjk;
+}
+
+function estimateTokens(chars, cjk) {
+  const lo = chars * ((1 - cjk) / CPT.latin[1] + cjk / CPT.cjk[1]);
+  const hi = chars * ((1 - cjk) / CPT.latin[0] + cjk / CPT.cjk[0]);
+  return [Math.round(lo), Math.round(hi)];
+}
+
+function updateTokenEstimate(chars) {
+  const out = $("tokEst"), note = $("tokNote");
+  if (!isFinite(chars) || chars <= 0) { out.textContent = "\u2014"; note.textContent = ""; return; }
+  const c = Math.min(LIMITS.budgetMax, Math.max(100, Math.floor(chars)));
+  const cjk = cjkShare(state.book);
+  const [lo, hi] = estimateTokens(c, cjk);
+  const f = n => n.toLocaleString("en-US");
+  out.textContent = "\u2248 " + f(lo) + " \u2013 " + f(hi) + " tokens";
+  const lat = CPT.latin[0] + "\u2013" + CPT.latin[1];
+  note.textContent = cjk >= 0.05
+    ? "(" + Math.round(cjk * 100) + "% CJK text in this lorebook)"
+    : "(~" + lat + " chars per token)";
+  out.title = "Rough estimate, not a tokenizer count. Assumes about " + lat + " characters per token for Latin-script text" +
+    (cjk >= 0.05 ? " and " + CPT.cjk[0] + "\u2013" + CPT.cjk[1] + " for Chinese/Japanese/Korean text (" + Math.round(cjk * 100) + "% of this lorebook's content)" : "") +
+    ". The real figure depends on the model's tokenizer. The budget counts entry content characters only.";
+}
+
+/* ── Theme toggle ───────────────────────────────────────────────────────────
+   The saved choice is restored by the tiny script in <head>; this wires the
+   button, persists changes, and keeps other open tabs in sync. */
+const THEME_KEY = "lorebook-testbench-theme";
+const isTheme = t => t === "light" || t === "dark";
+function currentTheme() { return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark"; }
+function applyTheme(t, save) {
+  document.documentElement.setAttribute("data-theme", t);
+  const b = $("themeBtn");
+  b.textContent = t === "light" ? "\u263e Dark mode" : "\u2600 Light mode";
+  b.title = "Switch to " + (t === "light" ? "dark" : "light") + " mode";
+  b.setAttribute("aria-label", b.title);
+  if (save) { try { localStorage.setItem(THEME_KEY, t); } catch (err) { /* private mode / blocked: choice lasts for this page view only */ } }
+}
+$("themeBtn").addEventListener("click", () => applyTheme(currentTheme() === "light" ? "dark" : "light", true));
+window.addEventListener("storage", ev => { if (ev.key === THEME_KEY && isTheme(ev.newValue)) applyTheme(ev.newValue, false); });
+applyTheme(currentTheme(), false);
+
+render();
+</script>
+</body>
+</html>

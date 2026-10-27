@@ -1,185 +1,243 @@
 # The Woven Fate
 
-A single-file, browser-based text RPG. An AI game master narrates an evolving story in second person; you type what you do; the story adapts. There is no build step, no backend, and no install — `The_Woven_Fate.html` is the entire application.
+An AI-narrated, text-based RPG that runs entirely in your browser, plus the tools for preparing and testing the lorebooks that feed it.
 
----
+Everything here is a **single, self-contained HTML file**. There is no build step, no server, and nothing to install. Download a file and open it in a modern browser.
 
-## Table of contents
+## What's in the box
 
-- [Playing the game](#playing-the-game)
-- [How it works, technically](#how-it-works-technically)
-- [Hosting it](#hosting-it)
-- [Known limitations](#known-limitations)
-
----
-
-## Playing the game
-
-### Starting a tale
-
-On the setup screen you choose:
-
-| Choice | What it affects |
+| File | What it is |
 |---|---|
-| **Mood** (Tragic, Dark, Neutral, Whimsical, Comedic, Romantic, Mysterious, Heroic) | The emotional tone of the prose — how forgiving or brutal the story is. |
-| **Setting** (Contemporary, Urban Fantasy, High Fantasy, Folk & Myth, Steampunk, Sci-Fi, Western, Historical, School & Academy) | The world your character exists in. |
-| **Plot Engine** (Story-Driven, Detective & Mystery, Crime, Spy, Action, Adventure, Superhero, Gothic/Cosmic/Monster Horror, Swashbuckling, Political Intrigue) | The *kind* of plot that emerges — a detective story surfaces clues and suspects, an action story escalates set-pieces, and so on. "Story-Driven" lets the plot shape itself from Mood + Setting alone. |
-| **Character** (optional) | Gender and a free-text description. Mentioning an occupation or crew (*"a grizzled detective"*, *"captain of a smuggling crew"*) shapes your starting gear and supporting cast — see **Tools of the Trade** below. |
-| **API Target** | Which AI service answers your actions (see [Hosting it](#hosting-it) and the Technical section). You must select or add one before you can begin. |
+| `The_Woven_Fate.html` | The game. Story memory is a running journal and chapter "books". |
+| `The_Woven_Fate_Dynamic.html` | The same game, with the journal replaced by a **dynamic lorebook** the AI writes and maintains as you play. |
+| `Lorebook_Converter.html` | Converts lorebooks from other tools into the Woven format. |
+| `Lorebook_Testbench.html` | Offline analysis of how a lorebook behaves against sample scenes and a character budget. |
 
-Hit **Random ⚄** to roll Mood/Setting/Engine/Character for you, or **Begin Your Tale** once Mood, Setting, and an API Target are set.
+A typical workflow:
 
-### Playing a turn
+1. **Convert** an existing lorebook with the Converter (or write one by hand).
+2. **Test** it in the Testbench to see which entries fire and which get squeezed out by the budget.
+3. **Play** it in The Woven Fate (or the Dynamic variant).
 
-Each turn, you either:
+---
 
-- **Type an action** in the box at the bottom and hit **Act** (or Enter — Shift+Enter for a newline), or
-- Hit **Continue ⟳** to let the story advance on its own without you specifying an action, or
-- Hit **Suggest 💡** for three AI-generated ideas of what you could do next, if you're stuck.
+## The Woven Fate (`The_Woven_Fate.html`)
 
-Behind the scenes, your action is judged as one of three things:
+You describe what your character does. An AI game master narrates the result in second person.
 
-- **Plain narrative** — low-stakes actions (looking around, talking) just continue the story.
-- **Item resolution** — if a carried item plausibly and directly resolves the action (using a bandage to tend a wound), it's consumed and the story continues — no dice roll needed.
-- **A challenge** — anything with real stakes (a fight, a lie, a locked door) triggers **a moment of fate**.
+### Getting started
 
-### Moments of fate
+1. Open the file and choose **+ Add API Target** (or the ⚙ icon).
+2. Pick a service type, enter the URL and your API key, and save. A model name is optional and overrides the default.
+3. On the setup screen pick a **setting**, a **plot engine**, a **mood**, and optionally a character gender and description. **Random ⚄** picks for you.
+4. Optionally load a lorebook with **📖 Load / manage**.
+5. Press begin and start acting.
 
-When a challenge triggers, three symbols (✎) appear. One or more may be marked *favorable* or *unfavorable* first, based on your gear, background, and active conditions (see below) — the game tells you why. Pick one, and it reveals one of four outcomes:
+### Supported API services
+
+Anthropic (Claude), OpenAI (GPT), Google Gemini, Groq, Mistral, DeepSeek, xAI (Grok), OpenRouter, Together AI, Fireworks AI, and any OpenAI-compatible endpoint (Ollama, LM Studio, custom proxies). You can save several named targets and switch between them. The default model is `claude-sonnet-4-6`.
+
+Calls go **directly from your browser** to the service you choose. There is no backend proxy. Local or self-hosted endpoints may need CORS enabled.
+
+### Story options
+
+- **Settings (9):** Contemporary, Urban Fantasy, High Fantasy, Folk & Myth, Steampunk, Sci-Fi, Western, Historical, School & Academy
+- **Plot engines (12):** Story-Driven, Detective & Mystery, Crime, Spy & Espionage, Action, Adventure, Superhero, Gothic Horror, Cosmic Horror, Monster Horror, Swashbuckling, Political Intrigue
+- **Moods (8):** Tragic, Dark, Neutral, Whimsical, Comedic, Romantic, Mysterious, Heroic
+
+### How a turn works
+
+For each action you type, the game master decides one of three things:
+
+- **Narrative:** nothing is at stake, so the story simply continues.
+- **Item resolution:** a specific carried item plausibly solves the problem and is used up.
+- **Challenge:** something meaningful is at risk, so Fate gets a say.
+
+On a challenge you are shown three face-down buttons: **Fortune Smiles**, **Fate Turns Away**, and **The Weave**. The mix depends on how well your gear, skills, and conditions suit the task:
+
+| Situation | Buttons on offer |
+|---|---|
+| Neutral odds | Fortune Smiles, Fate Turns Away, The Weave |
+| Favourable | Fortune Smiles, The Weave, The Weave |
+| Unfavourable | Fate Turns Away, The Weave, The Weave |
+
+The positions are shuffled. The Weave is a wildcard that resolves to a random one of the four outcomes below.
 
 | Outcome | Meaning |
 |---|---|
-| ✦ **Victory** | Complete success. |
-| ✗ **Defeat** | Total failure. |
-| ◈ **Costly Victory** | You succeed, but at a price. |
-| ◇ **Near Miss** | You fail, but not catastrophically. |
+| Victory | Complete triumph |
+| Costly Victory | Won, but at a price |
+| Near Miss | Failed, but not broken |
+| Defeat | Total failure |
 
-The three symbols are a random mix of these outcomes (weighted toward success or failure if the moment was favorable/unfavorable), plus a wildcard **"The Weave"** option that resolves to a fully random outcome when picked. The story then continues based on what you chose.
+The AI then narrates the chosen outcome.
 
-### Quest, Items, and Conditions ("Quest & Items" / "Status" panels)
+### Tracked state
 
-The game automatically tracks, without you managing anything directly:
+After each narration, the game extracts and tracks:
 
-- **Quest** — at most one active goal at a time, set/updated/completed by the narrative itself.
-- **Key Items** (max 3) — plot-critical, irreplaceable items.
-- **Items** (max 5) — general inventory; click **✕** to drop one manually.
-- **Tools of the Trade** — a fixed baseline kit inferred from your character's occupation/setting at the start (a detective's badge and phone, a knight's sword and armor) — always carried, never counted against your item limits.
-- **Conditions** (Status panel) — afflictions and buffs, in four tiers: **Superficial** (fades after a few turns), **Moderate**, **Severe** (needs active treatment), and **Positive** (buffs, cleared at scene changes). These feed back into whether your next challenge is favorable or unfavorable.
+- Your current **quest** and completed quests
+- **Key items** and **general items** (gained and lost)
+- **Tools of the Trade**, a baseline kit derived from your character
+- **Characters** you meet, including role, status (ally, hostile, romantic, and so on), aliases, and merges
+- **Conditions**: superficial, moderate, severe, and positive. Moderate and severe conditions, and positive ones, feed back into later challenge odds.
 
-If a tier fills up, new entries of that severity escalate to the next tier instead of being silently dropped (repeated superficial injuries can cascade into something moderate, then severe) — and if severe conditions are completely full, a bad enough hit can outright fail your active quest.
+### Other features
 
-### Journal & Books
+- **Suggestions** for what to do next, with re-roll
+- **Continue the story** and **Regenerate** for the last response
+- **Books:** when enough has happened the game offers to close a chapter, summarise it, and carry the summary forward
+- **Saves:** manual saves, an **autosave** (every 5 turns, toggleable), rename, delete, and export/import as JSON
+- Light and dark themes
+- A **Debug stats** toggle that shows lorebook and API stats under each response
 
-- **Journal panel** — a running list of named characters you've met (with relationship notes and role), plus a log of notable events since the last "Book."
-- **Merge Characters** — if the same person gets tracked as two separate entries (e.g. a masked vigilante and their later-revealed civilian identity), select two in the Journal and merge them.
-- **Books** — periodically (or after finishing a quest, when the game will suggest it), you can close out a "Book": the AI writes a chapter title and summary condensing everything since the last one, optionally proposes a small addition to your character's description reflecting how they've grown, and archives the detailed event log so it doesn't grow forever. Past Books remain browsable in the Books panel.
+### Lorebooks in the game
 
-### Saving
-
-- **Save** / **Save As New** — manual snapshots, browsable and resumable from the **Saves** screen, where you can also **Rename**, **Export** (download as `.json`), **Import** (upload one back in), or **Delete** them.
-- **Autosave** — on by default, saves automatically every 5 narrated turns to a dedicated autosave slot (toggle in the Saves screen).
-- A tale too large to fit under the storage size limit will warn you to export and free up space rather than silently fail.
+A lorebook is a JSON file (see [Lorebook format](#lorebook-format)). On every turn the game scans the **last 4 messages plus your current action** for entry keys, then adds matching entries to the narrator's context until the **character budget** runs out. The budget can be adjusted in the lorebook dialog. The narrator is told to treat lore as canon but never to quote it or mention a lorebook.
 
 ---
 
-## How it works, technically
+## The Woven Fate: Dynamic (`The_Woven_Fate_Dynamic.html`)
 
-Everything — markup, styles, and logic — lives in **one HTML file** with no external dependencies and no build step. It's organized into clearly labeled sections inside a single `<script>` block:
+Identical gameplay, with a different long-term memory system.
 
-```
-CONSTANTS & PROMPTS      → moods/settings/engines, tuning limits, theme color tables
-PROVIDER REGISTRY        → per-AI-service request/response adapters (see below)
-STORAGE SHIM             → a window.storage-compatible API backed by localStorage
-API SERVICE & JSON PARSER→ the fetch() call itself, plus a defensive JSON parser
-STATE STORE (S)          → one plain object holding all application state
-GAME ENGINE LOGIC        → turn resolution, quest/item/condition extraction, saves, books
-RENDERING                → HTML-string templates + targeted DOM update functions
-EVENT DELEGATION         → two listeners on the root element route every click/input
-```
-
-### State & rendering
-
-There's no framework. A single global object `S` holds everything (current screen, mood/setting/engine, player state, message log, save-tracking, etc.), and a `setState(updater, updateFn)` helper is the standard way to mutate it: make the change, persist a lightweight session snapshot to `localStorage`, then run whichever UI refresh actually needs to happen.
-
-Rendering is otherwise plain string-templating into `innerHTML` — but *not* a full-page rebuild on every change. The Setup and Saves screens are cheap enough to fully re-render each time. The **game screen** is mounted once and then only ever patched by small, targeted functions (`updateInventoryUI()`, `updateJournalUI()`, `updateSaveBar()`, `appendMessage()`, and so on) so that typing in the action box, mid-turn scroll position, and text selection all survive updates elsewhere on the screen without being wiped.
-
-New narration is *appended* to the log rather than triggering a rebuild of the whole conversation; quest/inventory/condition tags attached after the fact patch just that one message in place.
-
-### The AI provider system
-
-There is no fixed AI backend. Under the gear icon (⚙), you configure one or more named **API Targets** — each a Service URL, a Service Type, an optional Model override, and an optional API key — and pick which one is active before starting a tale. Calls go **directly from your browser** to that URL; there's no server in between unless you build one yourself.
-
-A small provider registry (`PROVIDERS` in the source) abstracts over the wildly different request/response shapes different AI services use, so the rest of the game just calls one function and gets a plain string back:
-
-| Provider | Auto-detected from | Notes |
+| | Standard | Dynamic |
 |---|---|---|
-| Anthropic (Claude) | `api.anthropic.com` | Sends `x-api-key` + the Anthropic-specific headers required for direct browser calls. |
-| OpenAI (GPT) | `api.openai.com` | Standard Chat Completions shape. |
-| Google Gemini | `generativelanguage.googleapis.com` | Uses `x-goog-api-key`; maps message roles to Gemini's `user`/`model` convention. |
-| Groq, Mistral, DeepSeek, xAI (Grok), OpenRouter, Together AI, Fireworks AI | their respective API hostnames | All speak an OpenAI-compatible Chat Completions shape; each just has its own endpoint path and a suggested default model. |
-| Other (OpenAI-compatible) | never auto-detected | For Ollama, LM Studio, or any custom/self-hosted OpenAI-compatible server. |
+| Story memory | Journal of events + chapter books | AI-maintained **story-so-far** summary + **dynamic lorebook** |
+| Extra AI call per turn | no | yes (the memory update) |
+| Memory budget | n/a | **Story lore budget**, default 4,000 chars (Settings ⚙), separate from the static lorebook |
+| Chat history window | 20 messages | 15 messages |
 
-**Detection details:**
-- A bare origin (`https://api.openai.com`) gets the provider's conventional path appended automatically; paste a full URL *with* a path and it's used exactly as typed, so you can point at an unusual or custom route.
-- `localhost`, `127.0.0.1`, and other numeric/local addresses are **never** auto-detected — the Service Type dropdown starts blank and you must pick one explicitly (Save is disabled until you do), since there's no way to guess what's running on a local port.
-- Model names and guessed endpoint paths are best-effort and will go stale over time — the Model field is a free-text override for exactly this reason.
+After each turn the AI is asked to update a rolling summary (up to 1,500 characters) and to create or revise entries for people, places, and things that have appeared (up to 150 entries, 600 characters each). These entries are keyed by name and fire like any other lorebook entry, so the game remembers things *when they become relevant* rather than carrying everything all the time. The story-so-far is always included and is charged to the dynamic budget first.
 
-Everything (targets, keys, theme, autosave preference, and a session snapshot for crash-recovery) is stored **only in your browser's `localStorage`**, namespaced under `woven_fate_*` keys. Nothing is ever sent anywhere except the exact URL you configure.
+- If a memory update fails, it is retried together with the next turn.
+- Your own static lorebook still works alongside it, with its own budget.
+- Because it makes an additional API call each turn, it costs somewhat more and is slower per turn than the standard version.
+- Dynamic lore is stored inside your saves. Saves from the standard version can be loaded; their journal and book content is used to seed the story-so-far.
 
-### Turn resolution (what actually gets sent to the AI)
-
-Each player action triggers a small pipeline of model calls:
-
-1. **Judge call** — classifies the action as narrative / item-resolution / challenge, and (for challenges) whether the player's gear, background, or active conditions make it favorable or unfavorable.
-2. **Narrative call** — writes the actual prose (2–3 paragraphs, second person, with formatting conventions for names/places/dialogue), given recent conversation history plus a condensed "story so far."
-3. **Extraction call** — a separate structured-JSON pass reads the narration that was just written and decides what changed: quest updates, items gained/lost, character updates (including alias/identity merges), and conditions gained/resolved.
-4. Periodically, older turns are **compacted** into short journal "events" (and, later, "acts") by a summarization call, so the context sent to the model stays bounded no matter how long the tale runs — this is also what "Books" archive wholesale when you close a chapter.
-
-All model responses expected to be structured are requested as raw JSON and parsed defensively (`safeParseJSON`): code-fence markdown is stripped, and a parse failure logs to the console and falls back to a safe default rather than crashing the turn.
+Pick Dynamic for long campaigns where continuity matters. Pick the standard version for cheaper, simpler sessions.
 
 ---
 
-## Hosting it
+## Lorebook Converter (`Lorebook_Converter.html`)
 
-Because it's one static HTML file with no build step, "hosting" just means "serving this file over HTTP(S)."
+Converts lorebooks exported from other tools into the Woven format. Per its interface, it targets SillyTavern, NovelAI, JanitorAI, Agnai, SpicyChat, and similar JSON exports.
 
-### Locally
+**Usage:** drop a `.json` lorebook onto the window (or click to browse), check the preview, and press **Download Converted JSON**. The output is saved as `<original name>.woven.json`.
 
-**Simplest — just open it.** Double-click `The_Woven_Fate.html`, or drag it into a browser tab (`file://...`). Everything works this way, *except* that if your chosen AI Target's server enforces CORS restrictions on the `file://` origin, requests may be blocked by the browser — this mainly affects calling the real hosted Anthropic/OpenAI/Gemini APIs directly (see [Known limitations](#known-limitations)); a local server you control (below) generally won't have this problem.
+What it does:
 
-**Slightly more robust — serve it locally**, which behaves closer to a real deployment and is required if you're pointing at a `localhost` API Target (like Ollama) that expects a browser origin rather than `file://`:
+- Detects the shape of the input (object-keyed entries as in SillyTavern, or array-based entries)
+- Merges primary and secondary keys into one de-duplicated key list
+- Skips entries that are disabled
+- Maps the source's priority or insertion order onto the game's **1–10** scale (1 is highest priority). Values already between 1 and 10 pass through unchanged, larger values are scaled down, and entries with no priority get **5**.
+- Carries over the name, description, and budget (defaults to **8,000** characters if the source has none)
 
-```bash
-# Python (already installed on most systems)
-cd path/to/folder
-python3 -m http.server 8080
-# then open http://localhost:8080/The_Woven_Fate.html
+Things to check after converting:
 
-# Node, if you have it
-npx serve .
+- **Review the result.** Formats vary a lot between tools, and the converter only reads common field names.
+- **Entries need at least one key.** The game discards entries with no keys, so "always-on" or "constant" entries from other tools won't carry over as always-on. Give them keys, or fold them into the story setup.
+- **Budget.** A budget found in the source file is carried over as-is (a source `token_budget` is copied as a character count, not converted). Otherwise the converter writes 8,000, matching the game's own default. You can change it in the game's lorebook dialog, and the Testbench can help you pick a value.
+- **Priorities from other tools.** Order-style values above 10 are rescaled approximately (higher source value becomes a lower, stronger priority number), so skim the results and adjust any entries that matter.
+- Conversion runs locally. Your file is not uploaded anywhere.
 
-# or literally any other static file server
+---
+
+## Lorebook Testbench (`Lorebook_Testbench.html`)
+
+A deterministic simulator for answering "will my lorebook actually do what I expect?" without spending any API calls. It reproduces the game's keyword matching and budget selection, then shows how entries compete for space.
+
+It opens with a small embedded sample (the *Atheron* lorebook and one test scene). Use **Reset to embedded data** to return to it.
+
+### Loading your own data
+
+- **Load lorebook (.json):** the Woven format
+- **Load test scenes (.md / .json):** pieces of sample text to scan
+
+Scene files in Markdown look like this:
+
+```markdown
+## scene1: First-years gather in the great hall
+*Setting:* Atheron Magical Academy, start of term
+*Tests:* Whether academy entries outrank minor lore
+*Cast:* Mira, Headmaster Voss
+*Length:* 1200
+> The scene text goes here, as a blockquote.
+> Continue the quote on every line.
 ```
 
-### Online
+Each scene starts with a `## sceneN:` heading, optional `*Setting:*`, `*Tests:*`, `*Cast:*`, and `*Length:*` lines, and the text as `>` blockquote lines. A JSON array of `{id, title, setting, tests, cast, text}` objects also works.
 
-Any static hosting provider works — there's no server-side code to run. A few common options:
+### Controls
 
-- **GitHub Pages** — push the file to a repo, enable Pages in the repo settings, done.
-- **Netlify / Vercel / Cloudflare Pages** — drag-and-drop deploy of a single file works on all three's free tiers.
-- **A plain S3/Cloud Storage bucket with static website hosting enabled**, or literally any web server (nginx, Apache, Caddy) with the file dropped in its web root.
+- **Budget:** characters available for lore, with a live **estimated token range** next to it
+- **Simulated turns:** 50, 200, 500, or 1,000 random runs per scene. **Re-run simulation** repeats with the same settings.
+- **Theme toggle** (dark and light)
 
-There is nothing to configure server-side — no environment variables, no API keys to set on the host. Every visitor configures their **own** API Target and key (or none, for a keyless local/self-hosted target) from within the app itself, stored only in their own browser.
+### Tabs
 
-### A note on CORS if you're hosting your own AI-compatible proxy
+- **Overview:** one row per scene showing how many matched entries made it in, how much of the budget was used, whether everything fit, and counts of *contested* and *never in* entries
+- **Scenes:** the scene text with matched keys highlighted, a list of matched entries with their hit keys and inclusion probability, and the assembled context from one simulated turn
+- **Lorebook:** every entry with its priority, size, and statistics, sortable and filterable, with a note of which scenes use it
 
-If you're running your own backend (to keep a shared API key server-side, add logging, rate-limit, etc.) so that visitors don't need their own key, that server needs to send permissive CORS headers (`Access-Control-Allow-Origin`, etc.) for whatever origin you're hosting this file on, since the request is made directly from each visitor's browser. This is the standard way to work around the [known limitation](#known-limitations) below.
+### How selection is modelled
+
+This mirrors the game:
+
+- Keys match as **whole words or phrases**, case-insensitively, with curly quotes normalised. `*` matches any word characters (at most two per key).
+- Matched entries are tried in **priority order, 1 first and 10 last**, in random order within a priority level. An entry that doesn't fit the remaining budget is skipped, and the rest are still tried.
+- The budget counts **entry content only**. The `[Name]` labels are free.
+- An entry is **contested** if it makes the cut in some simulated turns but not others, and **never in** if it matched but practically never fits.
+
+### Limitations
+
+- Each scene is scanned on its own, as if it were a first turn. In the real game the last 4 messages of history are scanned too.
+- Token figures are estimates (roughly 3–4.5 characters per token for Latin text, with a separate range for Chinese, Japanese, and Korean). They are not a tokenizer count.
+- It tests matching and budgeting only. It does not call any AI, so it cannot tell you how the narrator will *use* the lore.
 
 ---
 
-## Known limitations
+## Lorebook format
 
-- **Direct browser calls to a commercial AI API may be blocked by CORS.** Anthropic's (and generally, most major providers') API does not currently allow arbitrary browser origins to call it directly, regardless of any headers sent — this is a server-side policy, not something this file can work around. If you hit this, your options are: point an API Target at a small proxy/relay you host yourself (which can add its own permissive CORS headers), or use a target that's designed for this (a local server like Ollama/LM Studio typically allows local browser origins by default).
-- **No server-side moderation, rate-limiting, or usage tracking.** Whoever's key is configured in a given browser pays for and is responsible for that browser's usage.
-- **Model names and guessed API paths will drift over time** as providers update their lineups — override them via the target's Model field / a full Service URL if a default stops working.
-- **State lives in that one browser.** Saves, targets, and keys are all `localStorage`-only; clearing site data or switching browsers/devices starts fresh (use **Export**/**Import** on the Saves screen to move a tale between them).
+The format both the game and the Testbench read:
+
+```json
+{
+  "name": "Atheron",
+  "description": "A land of magic, adventure and intrigue.",
+  "character_budget": 8000,
+  "entries": [
+    {
+      "name": "Atheron Magical Academy",
+      "keys": ["academy", "atheron academy", "magic school"],
+      "content": "A centuries-old school of magic perched above the harbour town...",
+      "priority": 2
+    }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `name`, `description` | Labels only |
+| `character_budget` | Maximum characters of entry content added per turn. Falls back to 8,000 if missing. |
+| `entries[].name` | Shown as the `[Name]` label in context |
+| `entries[].keys` | Words or phrases that trigger the entry. At least one is required. `*` is a wildcard. |
+| `entries[].content` | The lore text the narrator sees |
+| `entries[].priority` | 1 to 10, where **1 is highest** and is added first when space is tight. Defaults to 5. |
+
+Entries without keys or content are dropped on load.
+
+---
+
+## Privacy and storage
+
+- API targets (including **API keys**), saves, session state, and theme preferences are stored in your browser's `localStorage`. They never leave your machine except in requests to the API service you configured.
+- Your lorebooks and story text *are* sent to that service as part of prompts.
+- Clearing site data for the page removes your keys and saves. Use **Export** on a save to keep a backup.
+- Individual saves are limited to roughly 4.8 MB.
+- Both game files use the same storage namespace (`woven_fate::`), so when they are served from the same browser origin they can see each other's saves and API targets. Browsers treat `file://` pages differently, so if saves don't appear in the other version, use **Export** and **Import**.
+
+## Requirements
+
+A current desktop or mobile browser (Chrome, Edge, Firefox, Safari) and, for the game, an API key or a reachable local model endpoint. The Converter and Testbench need no API access and work offline.
