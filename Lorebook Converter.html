@@ -165,7 +165,7 @@
                     name: entry.comment || entry.name || `entry_${id}`,
                     keys: keys,
                     content: entry.content || "",
-                    priority: mapPriority(entry.priority || entry.insertion_order || 100)
+                    priority: mapPriority(entry.priority || entry.insertion_order)
                 });
             }
 
@@ -200,18 +200,17 @@
         }
 
         function mapPriority(value) {
-            if (value === undefined || value === null || isNaN(value)) return DEFAULT_PRIORITY;
-            // Already on the 1-10 scale: pass through
-            if (value >= 1 && value <= MAX_PRIORITY) return Math.round(value);
+            // Missing, blank, non-numeric, zero or negative: default, whatever the source format
+            const v = (value === undefined || value === null || value === "") ? NaN : Number(value);
+            if (!Number.isFinite(v) || v <= 0) return DEFAULT_PRIORITY;
 
-            // Larger source values (e.g. insertion order) mean higher priority, i.e. a lower number
-            if (value > 100) {
-                return Math.max(1, Math.min(MAX_PRIORITY, 11 - Math.floor(value / 100)));
-            } else if (value > 0) {
-                return Math.max(1, Math.min(MAX_PRIORITY, 11 - Math.ceil(value / 10)));
-            } else {
-                return DEFAULT_PRIORITY;
-            }
+            // Already on the 1-10 scale: pass through
+            if (v <= MAX_PRIORITY) return Math.max(1, Math.round(v));
+
+            // Order-style values (higher = stronger), mapped smoothly on a log scale:
+            // 10 -> 10, 100 -> 5, ~630 and above -> 1
+            const scaled = DEFAULT_PRIORITY * (3 - Math.log10(v));
+            return Math.max(1, Math.min(MAX_PRIORITY, Math.round(scaled)));
         }
 
         // --- UI Interactions & Event Listeners ---

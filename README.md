@@ -11,13 +11,15 @@ Everything here is a **single, self-contained HTML file**. There is no build ste
 | `The_Woven_Fate.html` | The game. Story memory is a running journal and chapter "books". |
 | `The_Woven_Fate_Dynamic.html` | The same game, with the journal replaced by a **dynamic lorebook** the AI writes and maintains as you play. |
 | `Lorebook_Converter.html` | Converts lorebooks from other tools into the Woven format. |
+| `Lorebook_Test_Editor.html` | A form-based editor for writing and validating the test scenes the Testbench reads. |
 | `Lorebook_Testbench.html` | Offline analysis of how a lorebook behaves against sample scenes and a character budget. |
 
 A typical workflow:
 
 1. **Convert** an existing lorebook with the Converter (or write one by hand).
-2. **Test** it in the Testbench to see which entries fire and which get squeezed out by the budget.
-3. **Play** it in The Woven Fate (or the Dynamic variant).
+2. **Write test scenes** in the Test Editor: short passages that should trigger particular entries.
+3. **Test** the lorebook against those scenes in the Testbench to see which entries fire and which get squeezed out by the budget.
+4. **Play** it in The Woven Fate (or the Dynamic variant).
 
 ---
 
@@ -130,7 +132,7 @@ What it does:
 - Detects the shape of the input (object-keyed entries as in SillyTavern, or array-based entries)
 - Merges primary and secondary keys into one de-duplicated key list
 - Skips entries that are disabled
-- Maps the source's priority or insertion order onto the game's **1–10** scale (1 is highest priority). Values already between 1 and 10 pass through unchanged, larger values are scaled down, and entries with no priority get **5**.
+- Maps the source's priority or insertion order onto the game's **1–10** scale (1 is highest priority). Values already between 1 and 10 pass through unchanged. Larger order-style values (higher means stronger) are rescaled smoothly on a log scale: 100 becomes 5, 200 becomes 3, and anything from about 630 up becomes 1. Entries with no usable priority get **5** in every source format.
 - Carries over the name, description, and budget (defaults to **8,000** characters if the source has none)
 
 Things to check after converting:
@@ -138,7 +140,7 @@ Things to check after converting:
 - **Review the result.** Formats vary a lot between tools, and the converter only reads common field names.
 - **Entries need at least one key.** The game discards entries with no keys, so "always-on" or "constant" entries from other tools won't carry over as always-on. Give them keys, or fold them into the story setup.
 - **Budget.** A budget found in the source file is carried over as-is (a source `token_budget` is copied as a character count, not converted). Otherwise the converter writes 8,000, matching the game's own default. You can change it in the game's lorebook dialog, and the Testbench can help you pick a value.
-- **Priorities from other tools.** Order-style values above 10 are rescaled approximately (higher source value becomes a lower, stronger priority number), so skim the results and adjust any entries that matter.
+- **Priorities from other tools.** Rescaled order-style values are approximate, so skim the results and adjust any entries that matter. A source value of exactly 10 or less is assumed to already be a 1-10 priority, so it is not rescaled.
 - Conversion runs locally. Your file is not uploaded anywhere.
 
 ---
@@ -152,7 +154,7 @@ It opens with a small embedded sample (the *Atheron* lorebook and one test scene
 ### Loading your own data
 
 - **Load lorebook (.json):** the Woven format
-- **Load test scenes (.md / .json):** pieces of sample text to scan
+- **Load test scenes (.md / .json):** pieces of sample text to scan. You can write these by hand or use the [Test Editor](#lorebook-test-editor-lorebook_test_editorhtml).
 
 Scene files in Markdown look like this:
 
@@ -194,6 +196,39 @@ This mirrors the game:
 - Each scene is scanned on its own, as if it were a first turn. In the real game the last 4 messages of history are scanned too.
 - Token figures are estimates (roughly 3–4.5 characters per token for Latin text, with a separate range for Chinese, Japanese, and Korean). They are not a tokenizer count.
 - It tests matching and budgeting only. It does not call any AI, so it cannot tell you how the narrator will *use* the lore.
+
+---
+
+## Lorebook Test Editor (`Lorebook_Test_Editor.html`)
+
+A simple editor for building the scene files that the Testbench loads, so you don't have to hand-write the Markdown format. Its limits mirror the Testbench's, so a file that passes here should also load there. Like the other tools, it runs entirely offline in your browser.
+
+### Using it
+
+- **New** starts an empty file, **Load…** opens an existing `.md` or `.json` scenes file, and **+ Add scene** inserts a scene after the one you have selected.
+- The left-hand list shows each scene's id, title, and "tests" note, with a search box to filter by id, title, setting, cast, or tests. A marker flags scenes with errors or warnings.
+- Select a scene to edit its **Id**, **Title**, **Setting**, **Tests** (which entries or behaviours the scene should exercise), **Cast**, and the **scene text** itself. A live character and word count sits above the text.
+- Per scene you can **Move up**, **Move down**, **Duplicate**, or **Delete**.
+- **Declared length** is optional metadata. **Match text** sets it to the actual text length, and if you leave it at 0 it is filled in when you save.
+- **Save .json** and **Save .md** download the file, and Ctrl/Cmd+S saves JSON. **Theme** toggles light and dark, sharing its setting with the Testbench.
+
+### Built-in checks
+
+Each scene is validated as you type, and the status bar shows the scene count and total characters against the Testbench's limits (100 scenes, 400,000 characters in total).
+
+| Level | Examples |
+|---|---|
+| **Error** | Missing or duplicate id, empty scene text, text over 20,000 characters, a single word longer than 100 characters |
+| **Warning** | A title, setting, tests, or cast field over 2,000 characters (it would be truncated), an id over 100 characters |
+| **Info** | An id that isn't of the form `sceneN`, a declared length that doesn't match the text, a missing "tests" note |
+
+Saving with errors, or with more than 100 scenes, asks for confirmation first, since the Testbench would reject or skip those scenes.
+
+### Things to know
+
+- **Scene ids and Markdown:** the Testbench's Markdown reader only recognises ids shaped like `scene1`, `scene2`, and so on. Other ids are fine in `.json` but are skipped from a `.md` save, and you are warned before saving.
+- **No autosave:** nothing is stored between sessions apart from the theme. Save your file before closing the tab. The editor warns you about unsaved changes when you load a file, start a new one, or leave the page.
+- **Loading:** files over 2 MB are refused, matching the Testbench. JSON files must be an array of scene objects.
 
 ---
 
@@ -240,4 +275,4 @@ Entries without keys or content are dropped on load.
 
 ## Requirements
 
-A current desktop or mobile browser (Chrome, Edge, Firefox, Safari) and, for the game, an API key or a reachable local model endpoint. The Converter and Testbench need no API access and work offline.
+A current desktop or mobile browser (Chrome, Edge, Firefox, Safari) and, for the game, an API key or a reachable local model endpoint. The Converter, Test Editor, and Testbench need no API access and work offline.

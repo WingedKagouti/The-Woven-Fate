@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lorebook Test Editor</title>
+<script>
+(function () {
+  try { var t = localStorage.getItem("lorebook-testbench-theme");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+})();
+</script>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #09090b; --panel: #18181b; --line: #27272a; --line2: #3f3f46;
+  --mute: #71717a; --dim: #a1a1aa; --text: #e4e4e7; --hi: #fde68a; --acc: #fbbf24;
+  --warn: #fcd34d; --bad: #fb7185; --ok: #34d399; --sel: rgba(251,191,36,.10);
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #fafafa; --panel: #ffffff; --line: #e4e4e7; --line2: #d4d4d8;
+  --mute: #63636b; --dim: #52525b; --text: #27272a; --hi: #92400e; --acc: #d97706;
+  --warn: #a94c08; --bad: #be123c; --ok: #047857; --sel: rgba(217,119,6,.10);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.5; display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+header { border-bottom: 1px solid var(--line); padding: .9rem 1rem; display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center; }
+h1 { margin: 0; font-size: 1.1rem; color: var(--hi); letter-spacing: .02em; }
+.status { font-size: .75rem; color: var(--mute); }
+.status b { color: var(--dim); font-weight: 400; }
+.tools { display: flex; flex-wrap: wrap; gap: .4rem; margin-left: auto; }
+.btn { border: 1px solid var(--line2); border-radius: .375rem; padding: .3rem .7rem; font-size: .8rem; background: transparent; cursor: pointer; color: var(--dim); }
+.btn:hover { border-color: var(--acc); color: var(--text); }
+.btn.pri { border-color: var(--acc); color: var(--hi); }
+.btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+.btn:disabled { opacity: .4; cursor: default; border-color: var(--line2); color: var(--dim); }
+.main { flex: 1; min-height: 0; display: grid; grid-template-columns: 19rem 1fr; }
+aside { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.search { padding: .6rem; border-bottom: 1px solid var(--line); }
+input[type=text], input[type=number], textarea { width: 100%; background: var(--panel); border: 1px solid var(--line2); border-radius: .375rem; padding: .4rem .6rem; }
+textarea { resize: vertical; }
+#list { overflow-y: auto; flex: 1; }
+.item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: .6rem .8rem; cursor: pointer; border-left: 3px solid transparent; }
+.item:hover { background: var(--sel); }
+.item.on { background: var(--sel); border-left-color: var(--acc); }
+.item .id { font-family: var(--mono); font-size: .7rem; color: var(--mute); display: flex; justify-content: space-between; }
+.item .ttl { font-size: .875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .tst { font-size: .72rem; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flag { color: var(--warn); }
+.flag.bad { color: var(--bad); }
+.empty { padding: 2rem 1.25rem; color: var(--mute); font-size: .875rem; }
+section.editor { overflow-y: auto; padding: 1.25rem 1.5rem 3rem; min-width: 0; }
+.bar { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+.grid { display: grid; grid-template-columns: 11rem 1fr; gap: .75rem; margin-bottom: .75rem; }
+label.f { display: block; font-size: .8rem; color: var(--dim); }
+label.f span { display: flex; justify-content: space-between; margin-bottom: .2rem; }
+label.f small { color: var(--mute); font-size: .72rem; }
+.hint { font-size: .72rem; color: var(--mute); margin: .2rem 0 0; }
+#text { font-family: var(--serif); font-size: 1rem; line-height: 1.6; min-height: 24rem; }
+.len { display: flex; gap: .5rem; align-items: center; }
+.len input { width: 7rem; }
+.issues { margin: 1rem 0 0; padding: 0; list-style: none; font-size: .8rem; }
+.issues li { padding: .2rem 0; }
+.issues .w { color: var(--warn); } .issues .e { color: var(--bad); } .issues .i { color: var(--mute); }
+.over { color: var(--bad); }
+@media (max-width: 760px) {
+  .main { grid-template-columns: 1fr; grid-template-rows: 14rem 1fr; }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Lorebook Test Editor</h1>
+    <div class="status" id="status"></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="newFile">New</button>
+    <button class="btn" id="load">Load…</button>
+    <button class="btn pri" id="saveJson" title="Ctrl+S">Save .json</button>
+    <button class="btn" id="saveMd">Save .md</button>
+    <button class="btn" id="theme">Theme</button>
+  </div>
+  <input type="file" id="file" accept=".json,.md,.markdown,.txt" hidden>
+</header>
+<div class="main">
+  <aside>
+    <div class="search"><input type="text" id="q" placeholder="Filter scenes…" aria-label="Filter scenes"></div>
+    <div id="list"></div>
+    <div class="search" style="border-top:1px solid var(--line);border-bottom:0"><button class="btn pri" id="add" style="width:100%">+ Add scene</button></div>
+  </aside>
+  <section class="editor" id="editor"></section>
+</div>
+
+<script>
+/* Limits mirror the testbench so a file that passes here also loads there. */
+const LIM = { scenes: 100, text: 20000, totalText: 400000, field: 2000, id: 100, wordRun: 100 };
+const CTRL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+const WORDRUN = new RegExp("[\\p{L}\\p{N}_]{" + (LIM.wordRun + 1) + ",}", "u");
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let scenes = [], sel = null, dirty = false, fname = "test-scenes", uid = 0;
+
+function mk(o) {
+  const s = (v, n) => typeof v === "string" ? v.replace(CTRL, "") : "";
+  const dl = Number(o.declaredLength);
+  return { uid: ++uid, id: s(o.id), title: s(o.title), setting: s(o.setting), tests: s(o.tests), cast: s(o.cast),
+    declaredLength: isFinite(dl) && dl > 0 ? Math.floor(dl) : 0, text: s(o.text) };
+}
+function nextId() {
+  let n = 0; scenes.forEach(s => { const m = /^scene(\d+)$/.exec(s.id); if (m) n = Math.max(n, +m[1]); });
+  return "scene" + (n + 1);
+}
+const cur = () => scenes.find(s => s.uid === sel);
+
+/* ── parsing (same formats the testbench reads) ── */
+function parseMd(raw) {
+  const out = []; let c = null;
+  raw.replace(/^\uFEFF/, "").replace(/\r/g, "").split("\n").forEach(line => {
+    let m;
+    if ((m = line.match(/^## (scene[0-9]+):\s*(.*)$/))) { if (c) out.push(c); c = { id: m[1], title: m[2].trim(), lines: [] }; return; }
+    if (!c) return;
+    if (line.startsWith(">")) { c.lines.push(line.replace(/^> ?/, "")); return; }
+    if ((m = line.match(/^\*Setting:\*\s*(.*)$/))) c.setting = m[1].trim();
+    else if ((m = line.match(/^\*Tests:\*\s*(.*)$/))) c.tests = m[1].trim();
+    else if ((m = line.match(/^\*Cast:\*\s*(.*)$/))) c.cast = m[1].trim();
+    else if ((m = line.match(/^\*Length:\*\s*([0-9]+)/))) c.declaredLength = +m[1];
+  });
+  if (c) out.push(c);
+  out.forEach(s => s.text = s.lines.join("\n"));
+  return out;
+}
+function parseFile(raw, name) {
+  const t = raw.trim();
+  if (/\.json$/i.test(name) || t.startsWith("[")) {
+    const arr = JSON.parse(t);
+    if (!Array.isArray(arr)) throw new Error("expected a JSON array of scenes");
+    return arr.filter(x => x && typeof x === "object" && !Array.isArray(x)).map(x => ({
+      id: typeof x.id === "number" ? String(x.id) : (x.id !== undefined ? x.id : x.name),
+      title: x.title, setting: x.setting, tests: x.tests, cast: x.cast, declaredLength: x.declaredLength,
+      text: typeof x.text === "string" ? x.text : (Array.isArray(x.textLines) ? x.textLines.filter(l => typeof l === "string").join("\n") : "") }));
+  }
+  const r = parseMd(raw);
+  if (!r.length) throw new Error("no scenes found; expected '## sceneN:' headers with blockquote text");
+  return r;
+}
+
+/* ── validation ── */
+function issues(s) {
+  const out = [];
+  if (!s.id.trim()) out.push(["e", "Missing id (the testbench will assign one)"]);
+  else if (scenes.some(o => o !== s && o.id === s.id)) out.push(["e", "Duplicate id “" + s.id + "”"]);
+  if (!s.text.trim()) out.push(["e", "No scene text: the testbench skips scenes without text"]);
+  if (s.text.length > LIM.text) out.push(["e", "Text is " + s.text.length + " chars; testbench limit is " + LIM.text]);
+  if (WORDRUN.test(s.text)) out.push(["e", "Contains a single word longer than " + LIM.wordRun + " characters"]);
+  ["title", "setting", "tests", "cast"].forEach(k => { if (s[k].length > LIM.field) out.push(["w", k + " is over " + LIM.field + " chars and will be truncated"]); });
+  if (s.id.length > LIM.id) out.push(["w", "id is over " + LIM.id + " chars and will be truncated"]);
+  if (!/^scene[0-9]+$/.test(s.id)) out.push(["i", "id isn’t of the form sceneN, so it won’t survive a .md save"]);
+  if (s.declaredLength && s.declaredLength !== s.text.length) out.push(["i", "Declared length (" + s.declaredLength + ") differs from actual text length (" + s.text.length + ")"]);
+  if (!s.tests.trim()) out.push(["i", "No “tests” note: say what this scene is meant to trigger"]);
+  return out;
+}
+
+/* ── rendering ── */
+function renderStatus() {
+  const total = scenes.reduce((n, s) => n + s.text.length, 0);
+  const bad = scenes.filter(s => issues(s).some(i => i[0] === "e")).length;
+  $("status").innerHTML = "<b>" + esc(fname) + "</b>" + (dirty ? " · unsaved changes" : "") + " · " + scenes.length + "/" + LIM.scenes + " scenes · " +
+    '<span class="' + (total > LIM.totalText ? "over" : "") + '">' + total.toLocaleString() + "/" + LIM.totalText.toLocaleString() + " chars</span>" +
+    (bad ? ' · <span class="flag bad">' + bad + " with errors</span>" : "");
+  document.title = (dirty ? "• " : "") + "Lorebook Test Editor";
+}
+function renderList() {
+  const q = $("q").value.trim().toLowerCase();
+  const vis = scenes.filter(s => !q || (s.id + " " + s.title + " " + s.tests + " " + s.cast + " " + s.setting).toLowerCase().includes(q));
+  $("list").innerHTML = vis.length ? vis.map(s => {
+    const is = issues(s), e = is.some(i => i[0] === "e"), w = is.some(i => i[0] === "w");
+    return '<button class="item' + (s.uid === sel ? " on" : "") + '" data-u="' + s.uid + '"><div class="id"><span>' + esc(s.id || "(no id)") + "</span>" +
+      (e ? '<span class="flag bad" title="Has errors">●</span>' : w ? '<span class="flag" title="Has warnings">●</span>' : "") + "</div>" +
+      '<div class="ttl">' + esc(s.title || "Untitled") + '</div><div class="tst">' + esc(s.tests) + "</div></button>";
+  }).join("") : '<div class="empty">' + (scenes.length ? "No scenes match." : "No scenes yet. Add one or load a file.") + "</div>";
+}
+function renderEditor() {
+  const s = cur(), ed = $("editor");
+  if (!s) { ed.innerHTML = '<div class="empty">Select a scene, add a new one, or load a test file.</div>'; return; }
+  const i = scenes.indexOf(s);
+  const field = (k, label, hint, area) => '<label class="f"><span>' + label + (hint ? "<small>" + hint + "</small>" : "") + "</span>" +
+    (area ? '<textarea data-k="' + k + '" rows="2">' : '<input type="text" data-k="' + k + '" value="') + esc(s[k]) + (area ? "</textarea>" : '">') + "</label>";
+  ed.innerHTML =
+    '<div class="bar"><button class="btn" data-a="up"' + (i === 0 ? " disabled" : "") + '>Move up</button><button class="btn" data-a="down"' + (i === scenes.length - 1 ? " disabled" : "") + '>Move down</button>' +
+    '<button class="btn" data-a="dup">Duplicate</button><button class="btn danger" data-a="del">Delete</button></div>' +
+    '<div class="grid">' + field("id", "Id") + field("title", "Title") + "</div>" +
+    '<div style="display:grid;gap:.75rem">' + field("setting", "Setting", "where and when") +
+    field("tests", "Tests", "which entries / behaviours this scene should exercise", true) +
+    field("cast", "Cast", "named characters, houses, places", true) + "</div>" +
+    '<label class="f" style="margin-top:.75rem"><span>Scene text<small id="tstat"></small></span><textarea id="text" data-k="text"></textarea></label>' +
+    '<div class="len" style="margin-top:.75rem"><label class="f" for="dl">Declared length</label><input type="number" min="0" id="dl" value="' + s.declaredLength + '">' +
+    '<button class="btn" data-a="len">Match text</button></div>' +
+    '<p class="hint">Declared length is optional metadata; leave 0 to have it filled from the text on save.</p><ul class="issues" id="issues"></ul>';
+  $("text").value = s.text;
+  updateMeta();
+}
+function updateMeta() {
+  const s = cur(); if (!s) return;
+  const words = (s.text.match(/\S+/g) || []).length;
+  const t = $("tstat"); if (t) t.innerHTML = '<span class="' + (s.text.length > LIM.text ? "over" : "") + '">' + s.text.length.toLocaleString() + "/" + LIM.text.toLocaleString() + "</span> chars · " + words + " words";
+  const ul = $("issues"); if (ul) ul.innerHTML = issues(s).map(([k, m]) => '<li class="' + k + '">' + esc(m) + "</li>").join("");
+  renderStatus(); renderList();
+}
+function render() { renderStatus(); renderList(); renderEditor(); }
+function touch() { dirty = true; }
+
+/* ── actions ── */
+function select(u) { sel = u; render(); }
+function confirmDiscard() { return !dirty || confirm("You have unsaved changes. Discard them?"); }
+
+$("list").addEventListener("click", e => { const b = e.target.closest(".item"); if (b) select(+b.dataset.u); });
+$("q").addEventListener("input", renderList);
+$("add").onclick = () => { const s = mk({ id: nextId() }); const c = cur(); scenes.splice(c ? scenes.indexOf(c) + 1 : scenes.length, 0, s); touch(); select(s.uid); $("editor").querySelector('[data-k="title"]').focus(); };
+$("newFile").onclick = () => { if (!confirmDiscard()) return; scenes = []; sel = null; dirty = false; fname = "test-scenes"; render(); };
+$("load").onclick = () => $("file").click();
+$("file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  if (!confirmDiscard()) return;
+  try {
+    if (f.size > 2 * 1024 * 1024) throw new Error("file is larger than the testbench’s 2 MB limit");
+    const list = parseFile(await f.text(), f.name).map(mk);
+    scenes = list; sel = list.length ? list[0].uid : null; dirty = false; fname = f.name.replace(/\.[^.]+$/, ""); render();
+  } catch (err) { alert("Could not load " + f.name + ": " + err.message); }
+};
+$("editor").addEventListener("input", e => {
+  const s = cur(), t = e.target; if (!s) return;
+  if (t.id === "dl") s.declaredLength = Math.max(0, Math.floor(+t.value) || 0);
+  else if (t.dataset.k) s[t.dataset.k] = t.value.replace(CTRL, "");
+  else return;
+  touch(); updateMeta();
+});
+$("editor").addEventListener("click", e => {
+  const b = e.target.closest("[data-a]"); const s = cur(); if (!b || !s) return;
+  const i = scenes.indexOf(s), a = b.dataset.a;
+  if (a === "up" || a === "down") { const j = i + (a === "up" ? -1 : 1); [scenes[i], scenes[j]] = [scenes[j], scenes[i]]; }
+  else if (a === "dup") { const c = mk(s); c.id = nextId(); c.title = s.title + " (copy)"; scenes.splice(i + 1, 0, c); sel = c.uid; }
+  else if (a === "del") { if (!confirm("Delete “" + (s.title || s.id) + "”?")) return; scenes.splice(i, 1); sel = scenes.length ? scenes[Math.min(i, scenes.length - 1)].uid : null; }
+  else if (a === "len") { s.declaredLength = s.text.length; }
+  touch(); render();
+});
+
+function download(name, mime, body) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([body], { type: mime })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function saveChecks() {
+  const errs = scenes.filter(s => issues(s).some(i => i[0] === "e")).length;
+  if (scenes.length > LIM.scenes) return confirm("This file has more than " + LIM.scenes + " scenes; the testbench will refuse it. Save anyway?");
+  return !errs || confirm(errs + " scene(s) have errors the testbench will reject or skip. Save anyway?");
+}
+const one = v => v.replace(/\s*\n\s*/g, " ").trim();
+$("saveJson").onclick = saveJson;
+function saveJson() {
+  if (!scenes.length || !saveChecks()) return;
+  const arr = scenes.map(s => ({ id: s.id, title: s.title, setting: s.setting, tests: s.tests, cast: s.cast, declaredLength: s.declaredLength || s.text.length, text: s.text }));
+  download(fname + ".json", "application/json", JSON.stringify(arr, null, 2) + "\n");
+  dirty = false; renderStatus();
+}
+$("saveMd").onclick = () => {
+  if (!scenes.length || !saveChecks()) return;
+  const bad = scenes.filter(s => !/^scene[0-9]+$/.test(s.id));
+  if (bad.length && !confirm(bad.length + " scene id(s) aren’t of the form sceneN, and the testbench’s markdown reader will skip them. Save anyway? (.json has no such restriction.)")) return;
+  const md = scenes.map(s => "## " + s.id + ": " + one(s.title) + "\n\n" +
+    (s.setting.trim() ? "*Setting:* " + one(s.setting) + "\n" : "") + (s.tests.trim() ? "*Tests:* " + one(s.tests) + "\n" : "") +
+    (s.cast.trim() ? "*Cast:* " + one(s.cast) + "\n" : "") + "*Length:* " + (s.declaredLength || s.text.length) + "\n\n" +
+    s.text.split("\n").map(l => "> " + l).join("\n").replace(/> $/gm, ">") + "\n").join("\n");
+  download(fname + ".md", "text/markdown", md);
+  dirty = false; renderStatus();
+};
+$("theme").onclick = () => {
+  const r = document.documentElement, t = r.getAttribute("data-theme") === "light" ? "dark" : "light";
+  r.setAttribute("data-theme", t); try { localStorage.setItem("lorebook-testbench-theme", t); } catch (e) {}
+};
+document.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveJson(); } });
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+render();
+</script>
+</body>
+</html>
