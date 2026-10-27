@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Woven Fate</title>
+<script>
+/* Share the theme setting with the game and the lorebook tools. */
+(function () {
+  try { var t = localStorage.getItem("lorebook-testbench-theme");
+    if (t === "light") document.documentElement.setAttribute("data-theme", "light"); } catch (e) {}
+})();
+</script>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0c0a0d; --bgCard: rgba(18,10,16,0.92); --bdr: #2e2218; --bdrH: #5a3a1a;
+  --text: #e2d5bc; --textM: #7a6448; --textD: #5a4a32;
+  --acc: #b8922a; --accHi: #d4a83a; --accLo: #3a2a18;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2ebe0; --bgCard: rgba(238,230,212,0.97); --bdr: #c4b080; --bdrH: #8a5e0a;
+  --text: #28180a; --textM: #6a5830; --textD: #8a7850;
+  --acc: #8a5e0a; --accHi: #6e4a08; --accLo: #c0a868;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text); font-family: var(--serif);
+  line-height: 1.6; min-height: 100vh;
+  padding: 0 1.25rem 4rem;
+}
+.wrap { max-width: 46rem; margin: 0 auto; }
+header { text-align: center; padding: 4rem 0 2.5rem; position: relative; }
+h1 { margin: 0; font-size: 2.4rem; letter-spacing: .06em; font-weight: 600; color: var(--accHi); }
+.tagline { margin: .5rem 0 0; color: var(--textM); font-style: italic; font-size: 1rem; }
+.themebtn {
+  position: absolute; top: 1.25rem; right: 0;
+  background: none; border: 1px solid var(--bdr); border-radius: 4px;
+  color: var(--textM); font-family: var(--serif); font-size: .75rem;
+  letter-spacing: 1px; padding: .3rem .7rem; cursor: pointer;
+}
+.themebtn:hover { color: var(--text); border-color: var(--bdrH); }
+h2 {
+  font-family: var(--sans); font-size: .8rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 2px;
+  color: var(--textD); margin: 2.25rem 0 .75rem;
+  border-bottom: 1px solid var(--bdr); padding-bottom: .4rem;
+}
+.cards { display: grid; gap: .75rem; }
+a.card {
+  display: flex; align-items: baseline; gap: .9rem;
+  background: var(--bgCard); border: 1px solid var(--bdr); border-radius: 8px;
+  padding: 1rem 1.25rem; text-decoration: none; color: inherit;
+  transition: border-color .15s, background .15s;
+}
+a.card:hover { border-color: var(--acc); }
+a.card:active { border-color: var(--accHi); }
+.card .icon { font-size: 1.3rem; flex-shrink: 0; width: 2rem; text-align: center; }
+.card .body { min-width: 0; }
+.card .name { font-size: 1.1rem; color: var(--accHi); }
+a.card:hover .name { text-decoration: underline; text-underline-offset: 3px; }
+.card .desc { font-family: var(--sans); font-size: .82rem; color: var(--textM); margin-top: .15rem; }
+.card .file { font-family: var(--sans); font-size: .7rem; color: var(--textD); margin-top: .3rem; }
+.badge {
+  font-family: var(--sans); font-size: .65rem; letter-spacing: 1px; text-transform: uppercase;
+  border: 1px solid var(--bdr); border-radius: 999px; color: var(--textM);
+  padding: .1rem .55rem; margin-left: .5rem; white-space: nowrap; vertical-align: middle;
+}
+footer {
+  margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--bdr);
+  font-family: var(--sans); font-size: .75rem; color: var(--textD);
+  text-align: center;
+}
+footer a { color: var(--textM); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <button class="themebtn" id="themeBtn" type="button">Theme</button>
+    <h1>The Woven Fate</h1>
+    <p class="tagline">An AI-narrated, text-based RPG that runs entirely in your browser.</p>
+  </header>
+
+  <h2>Play</h2>
+  <div class="cards">
+    <a class="card" href="The%20Woven%20Fate.html">
+      <span class="icon">&#x2726;</span>
+      <span class="body">
+        <span class="name">The Woven Fate</span>
+        <div class="desc">The game. Story memory is a running journal and chapter &ldquo;books&rdquo;.</div>
+        <div class="file">The Woven Fate.html &middot; needs an API target or local model endpoint</div>
+      </span>
+    </a>
+    <a class="card" href="The%20Woven%20Fate%20Dynamic.html">
+      <span class="icon">&#x25c8;</span>
+      <span class="body">
+        <span class="name">The Woven Fate &mdash; Dynamic<span class="badge">long campaigns</span></span>
+        <div class="desc">The same game, with the journal replaced by a dynamic lorebook the AI writes and maintains as you play.</div>
+        <div class="file">The Woven Fate Dynamic.html &middot; extra AI call per turn</div>
+      </span>
+    </a>
+  </div>
+
+  <h2>Lorebook Toolkit</h2>
+  <div class="cards">
+    <a class="card" href="Lorebook%20Converter.html">
+      <span class="icon">&#x2699;</span>
+      <span class="body">
+        <span class="name">Lorebook Converter</span>
+        <div class="desc">Convert lorebooks from SillyTavern, NovelAI, JanitorAI, Agnai, SpicyChat and more into the Woven format.</div>
+        <div class="file">Lorebook Converter.html &middot; works offline</div>
+      </span>
+    </a>
+    <a class="card" href="Lorebook%20Test%20Editor.html">
+      <span class="icon">&#x270d;</span>
+      <span class="body">
+        <span class="name">Lorebook Test Editor</span>
+        <div class="desc">A form-based editor for writing and validating the test scenes the Testbench reads.</div>
+        <div class="file">Lorebook Test Editor.html &middot; works offline</div>
+      </span>
+    </a>
+    <a class="card" href="Lorebook%20Testbench.html">
+      <span class="icon">&#x2696;</span>
+      <span class="body">
+        <span class="name">Lorebook Testbench</span>
+        <div class="desc">Offline analysis of how a lorebook behaves against sample scenes and a character budget &mdash; no API calls needed.</div>
+        <div class="file">Lorebook Testbench.html &middot; works offline</div>
+      </span>
+    </a>
+  </div>
+
+  <h2>Documentation</h2>
+  <div class="cards">
+    <a class="card" href="README.md">
+      <span class="icon">&#x1f4d6;</span>
+      <span class="body">
+        <span class="name">README</span>
+        <div class="desc">How everything fits together: getting started, the lorebook format, and each tool in detail.</div>
+        <div class="file">README.md</div>
+      </span>
+    </a>
+    <a class="card" href="License.txt">
+      <span class="icon">&#x2696;</span>
+      <span class="body">
+        <span class="name">License</span>
+        <div class="desc">The Woven Fate License &mdash; use, modify and share freely, with attribution.</div>
+        <div class="file">License.txt</div>
+      </span>
+    </a>
+  </div>
+
+  <footer>
+    Everything here is a single, self-contained HTML file &mdash; no build step, no server, nothing to install.
+  </footer>
+</div>
+
+<script>
+document.getElementById("themeBtn").addEventListener("click", function () {
+  var root = document.documentElement;
+  var next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+  if (next === "light") root.setAttribute("data-theme", next);
+  else root.removeAttribute("data-theme");
+  try { localStorage.setItem("lorebook-testbench-theme", next); } catch (e) {}
+});
+</script>
+</body>
+</html>
