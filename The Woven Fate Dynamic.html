@@ -146,7 +146,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.8.1-ratelimit-safe";
+const APP_VERSION="v4.8.2-ratelimit-safe";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -537,12 +537,25 @@ const API_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
 let _apiQueueTail = Promise.resolve();
 let _apiLastSentAt = 0;
 function apiSleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+/* Cross-tab coordination: every tab/window of this app shares the same
+   API key and therefore the same rate limit, so the "last request sent"
+   timestamp is also mirrored in localStorage and the most recent value
+   wins. Stamp it immediately before EVERY send, retries included. */
+const API_LAST_SENT_KEY = "woven_fate_api_last_sent_at";
+function apiReadLastSentAt(){
+  let shared = 0;
+  try{ const v = parseInt(window.localStorage.getItem(API_LAST_SENT_KEY),10); if(isFinite(v) && v>0) shared = v; }catch(e){}
+  return Math.max(_apiLastSentAt, shared);
+}
+function apiMarkSent(){
+  _apiLastSentAt = Date.now();
+  try{ window.localStorage.setItem(API_LAST_SENT_KEY, String(_apiLastSentAt)); }catch(e){}
+}
 function callViaApiQueue(sendFn){
   const run = async ()=>{
-    const wait = _apiLastSentAt + API_MIN_INTERVAL_MS - Date.now();
+    const wait = apiReadLastSentAt() + API_MIN_INTERVAL_MS - Date.now();
     if(wait>0) await apiSleep(wait);
-    _apiLastSentAt = Date.now();
-    return sendFn();
+    return sendFn(apiMarkSent);
   };
   const p = _apiQueueTail.then(run, run);
   _apiQueueTail = p.catch(()=>{});
@@ -551,7 +564,7 @@ function callViaApiQueue(sendFn){
 function apiRetryDelayMs(res, attempt){
   let ra = NaN;
   try{ ra = parseInt(res.headers && res.headers.get("retry-after"), 10); }catch(e){}
-  if(isFinite(ra) && ra>0 && ra<=120) return ra*1000;
+  if(isFinite(ra) && ra>0 && ra<=120) return Math.min(30000, ra*1000 + 300);
   return Math.min(30000, 1500*Math.pow(2, attempt));
 }
 
@@ -571,9 +584,10 @@ async function callClaude(messages,system,maxTokens){
   const _t0=Date.now();
   let res;
   try{
-    res = await callViaApiQueue(async ()=>{
+    res = await callViaApiQueue(async (markSent)=>{
       const reqBody = JSON.stringify(body);
       for(let attempt=0; ; attempt++){
+        markSent(); // stamp immediately before the request actually leaves
         const r = await fetch(endpoint, {method:"POST", headers, body:reqBody});
         if(API_RETRY_STATUSES.has(r.status) && attempt<API_MAX_RETRIES){
           try{ await r.text(); }catch(e2){} // drain the body before retrying
