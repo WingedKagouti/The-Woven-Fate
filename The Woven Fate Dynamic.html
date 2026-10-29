@@ -146,7 +146,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.8-dynamic";
+const APP_VERSION="v4.8.1-ratelimit-safe";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -232,11 +232,18 @@ function openAiCompatibleParseText(data){
   return typeof content==="string" ? content : null;
 }
 function openAiCompatibleParseError(data){
-  if(!data || !data.error) return null;
-  const err = data.error;
-  const message = typeof err==="string" ? err : (err.message||JSON.stringify(err));
-  const type = (typeof err==="object" && (err.type||err.code)) || "unknown";
-  return {type:String(type), message};
+  if(!data || typeof data!=="object") return null;
+  if(data.error){ // OpenAI-style nested error: {error:{message,type,code}}
+    const err = data.error;
+    const message = typeof err==="string" ? err : (err.message||JSON.stringify(err));
+    const type = (typeof err==="object" && (err.type||err.code)) || "unknown";
+    return {type:String(type), message};
+  }
+  // Mistral-style flat error body: {object:"error", message, type, code, param}
+  if((data.object==="error" || data.code) && data.message){
+    return {type:String(data.type||data.code||"unknown"), message:String(data.message), raw:data};
+  }
+  return null;
 }
 
 const PROVIDERS = {
@@ -516,6 +523,38 @@ function newId(){return `${Date.now()}_${Math.random().toString(36).slice(2,8)}`
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
 function byteLength(str){ try{ return new Blob([str]).size; }catch(e){ return str.length; } }
 
+/* ---- Rate-limit safety: spacing queue + retry with backoff ----
+   Strict API tiers (e.g. Mistral Free mode at ~1 request/second) reject
+   bursts, and this app fires several API calls per turn (game setup:
+   tools + names + opening scene + state extraction; later turns:
+   narration + extraction). Every call is therefore funneled through a
+   queue that spaces request starts at least API_MIN_INTERVAL_MS apart,
+   and transient 429/5xx responses are retried with exponential backoff
+   (honouring a readable Retry-After header when the browser exposes it). */
+const API_MIN_INTERVAL_MS = 1100;
+const API_MAX_RETRIES = 4;
+const API_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+let _apiQueueTail = Promise.resolve();
+let _apiLastSentAt = 0;
+function apiSleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+function callViaApiQueue(sendFn){
+  const run = async ()=>{
+    const wait = _apiLastSentAt + API_MIN_INTERVAL_MS - Date.now();
+    if(wait>0) await apiSleep(wait);
+    _apiLastSentAt = Date.now();
+    return sendFn();
+  };
+  const p = _apiQueueTail.then(run, run);
+  _apiQueueTail = p.catch(()=>{});
+  return p;
+}
+function apiRetryDelayMs(res, attempt){
+  let ra = NaN;
+  try{ ra = parseInt(res.headers && res.headers.get("retry-after"), 10); }catch(e){}
+  if(isFinite(ra) && ra>0 && ra<=120) return ra*1000;
+  return Math.min(30000, 1500*Math.pow(2, attempt));
+}
+
 async function callClaude(messages,system,maxTokens){
   const target = activeTarget();
   if(!target){
@@ -532,7 +571,18 @@ async function callClaude(messages,system,maxTokens){
   const _t0=Date.now();
   let res;
   try{
-    res = await fetch(endpoint, {method:"POST", headers, body:JSON.stringify(body)});
+    res = await callViaApiQueue(async ()=>{
+      const reqBody = JSON.stringify(body);
+      for(let attempt=0; ; attempt++){
+        const r = await fetch(endpoint, {method:"POST", headers, body:reqBody});
+        if(API_RETRY_STATUSES.has(r.status) && attempt<API_MAX_RETRIES){
+          try{ await r.text(); }catch(e2){} // drain the body before retrying
+          await apiSleep(apiRetryDelayMs(r, attempt));
+          continue;
+        }
+        return r;
+      }
+    });
   }catch(networkErr){
     throw new Error(`Network error \u2014 could not reach "${target.name}" (${networkErr.message})`);
   }
@@ -548,7 +598,7 @@ async function callClaude(messages,system,maxTokens){
       const resetStr = resetDate ? formatResetTime(resetDate) : null;
       throw new Error(resetStr ? `Rate limited / overloaded \u2014 limit resets around ${resetStr}` : `Rate limited / overloaded \u2014 try again shortly (${m})`);
     }
-    if(/rate.?limit/i.test(ty) || res.status===429) throw new Error(`Rate limited / overloaded on "${target.name}" \u2014 try again shortly (${m})`);
+    if(/rate.?limit/i.test(ty) || res.status===429) throw new Error(`Rate limited on "${target.name}" \u2014 ${API_MAX_RETRIES+1} spaced retries didn't get through, so the limit is likely exhausted for this minute (last message: ${m})`);
     if(ty==="invalid_request_error") throw new Error(`Invalid request to "${target.name}" (${m})`);
     if(ty==="authentication_error"||ty==="permission_error"||res.status===401||res.status===403){
       openSettingsModal();
