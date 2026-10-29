@@ -146,7 +146,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.8.5-setup-robustness";
+const APP_VERSION="v4.8.7-settings-version";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -660,6 +660,46 @@ function extractFirstJsonObject(s){
   }
   return undefined;
 }
+function closeOpenJson(prefix){
+  /* Re-scans prefix and returns it with any unterminated string, brackets
+     and braces closed, so a cut-off JSON body can parse. */
+  const stack=[]; let inStr=false, esc=false;
+  for(let i=0;i<prefix.length;i++){
+    const ch=prefix[i];
+    if(esc){ esc=false; continue; }
+    if(inStr){
+      if(ch==="\\") esc=true;
+      else if(ch==='"') inStr=false;
+      continue;
+    }
+    if(ch==='"') inStr=true;
+    else if(ch==="{") stack.push("}");
+    else if(ch==="[") stack.push("]");
+    else if(ch==="}"||ch==="]") stack.pop();
+  }
+  let out=prefix;
+  if(inStr) out+='"';
+  return out+stack.slice().reverse().join("");
+}
+function repairTruncatedJson(s){
+  /* Salvages a JSON object that was cut off mid-transmission (the model's
+     token limit): closes the open structure as-is first, then progressively
+     drops the trailing partial field (cutting at structural commas) until
+     something parses. Returns the parsed object or undefined. */
+  const start=s.indexOf("{");
+  if(start===-1) return undefined;
+  const body=s.slice(start);
+  const tryParse=(t)=>{ try{ return JSON.parse(t); }catch(e){ return undefined; } };
+  let r=tryParse(closeOpenJson(body));
+  if(r!==undefined) return r;
+  for(let cut=body.length-1;cut>=0;cut--){
+    if(body[cut]===","){
+      r=tryParse(closeOpenJson(body.slice(0,cut)));
+      if(r!==undefined) return r;
+    }
+  }
+  return undefined;
+}
 function safeParseJSON(input, fallback){
   if(fallback===undefined) fallback=null;
   try{
@@ -680,6 +720,12 @@ function safeParseJSON(input, fallback){
     if(ex!==undefined) return ex;
     ex = extractFirstJsonObject(deblocked);
     if(ex!==undefined) return ex;
+    /* Attempt 4: the reply was cut off mid-stream by the model's token
+       limit (in-game JSON wraps whole narrations, so a long scene can
+       exceed max_tokens). Repair the truncation so every complete field
+       survives and only the final partial value is lost. */
+    const repaired = repairTruncatedJson(stripped);
+    if(repaired!==undefined) return repaired;
     throw new Error("no JSON object found in reply");
   }catch(err){
     console.error("safeParseJSON: JSON parsing failed, returning fallback state", err, input);
@@ -1212,7 +1258,7 @@ function refreshSettingsHub(){
   const val="font-size:11px;color:var(--textD);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
   host.innerHTML=`<div data-sh="close" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px">
     <div style="background:var(--bgCard);border:1px solid var(--bdrM);border-radius:8px;padding:20px;max-width:440px;width:100%;color:var(--text);display:flex;flex-direction:column;gap:10px">
-      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);margin-bottom:4px">Settings</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--acc)">Settings</span><span title="App version" style="font-size:10px;color:var(--textD);opacity:0.7;letter-spacing:1px">${APP_VERSION}</span></div>
       <button data-sh="api" style="${row}"><span>API Target</span><span style="${val}">${escapeHtml(activeTargetSummary())}</span></button>
       <button data-sh="lore" style="${row}"><span>Lorebook</span><span style="${val}">${escapeHtml(lorebookSummary())}</span></button>
       <label style="${row}"><span>Story lore budget<br><span style="font-size:10px;color:var(--textD)">Characters for the dynamic lorebook (separate from the static one)</span></span><input type="number" min="500" step="500" data-sh="dynbudget" value="${S.dynLore.budget}" style="width:90px"/></label>
@@ -1318,7 +1364,7 @@ async function extractState(narrativeText,pInfo,curQuest,curKey,curItems,curChar
     const cond = curConditions || DEFAULT_CONDITIONS;
     const condLine = `Current conditions \u2014 superficial: ${cond.superficial.map(c=>c.label).join(", ")||"none"}; moderate: ${cond.moderate.map(c=>c.label).join(", ")||"none"}; severe: ${cond.severe.map(c=>c.label).join(", ")||"none"}; positive: ${cond.positive.map(c=>c.label).join(", ")||"none"}`;
     const prompt=`Recent narration:\n"""${narrativeText}"""\n\nCurrent quest: ${curQuest?`${curQuest.title} \u2014 ${curQuest.desc}`:"none"}\n${toolsLine}\nCurrent key items: ${curKey.map(i=>i.name).join(", ")||"none"}\nCurrent general items: ${curItems.map(i=>i.name).join(", ")||"none"}\nKnown characters (with what's known about them so far): ${knownCharsLine}\n${condLine}\n\nAnalyse ONLY what this narration establishes. Return ONLY raw JSON:\n{\n "questUpdate": {"action":"set"|"update"|"complete"|"none","title":"...","desc":"..."},\n "itemsGained": [{"name":"...","desc":"...","key":boolean}],\n "itemsLost": ["exact name", ...],\n "characterUpdates": [{"name":"...","present":true|false,"status":"ally|hostile|neutral|unknown|romantic|deceased|other or null","note":"short one-line description/relationship, or null","role":"short stable descriptor of their occupation/role/abilities, or null","alsoKnownAs":"an ADDITIONAL name/alias for this character being genuinely revealed or established this turn (e.g. a hero's civilian identity, or vice versa) \u2014 both names remain valid and may both be used going forward; or null","replaces":"exact prior name from the Known characters list above, ONLY if this character was previously tracked under a different name or generic placeholder (e.g. 'Rescued Hostage') and has now been properly identified as the same individual \u2014 else null"}],\n "conditionsGained": [{"tier":"superficial"|"moderate"|"severe"|"positive","label":"short name","desc":"short description"}],\n "conditionsResolved": ["exact label", ...],\n "sceneEnded": true|false\n}\nRules: For questUpdate \u2014 use "set" ONLY when there was no active quest and a brand-new one is being established. Use "update" when the ALREADY-active quest's specifics, title, or immediate objective are being refined/progressed but it is fundamentally the same overarching goal \u2014 do NOT use "set" for this, that incorrectly signals a brand new quest to the player. Use "complete" when the active quest has just been fully resolved. Use "none" if nothing quest-related changed. Don't invent goals from flavor text alone. Only list itemsGained if something tangible was NEWLY acquired this turn \u2014 never for gear that is part of the Tools of the Trade kit above (that kit is always already carried, mentioning it again is not a new pickup). Only list itemsLost if something was clearly consumed, destroyed, given away, lost, or stolen. key=true only for plot-critical, irreplaceable items.\nFor characterUpdates: include a named, significant character (not background extras) whenever they are present in this scene OR clearly just left/exited it. Only reference characters from the Known characters list, or genuinely new characters actually appearing in THIS narration \u2014 never reuse a name from the Known characters list for an unrelated new character just because it happens to be listed as "known". Set "present" to true if they are in the scene right now, false if they just departed. ONLY set "status" and "note" if something about the character's relationship, disposition, or situation actually changed this turn \u2014 otherwise leave them as null so their prior relationship/description is preserved untouched. NEVER use status or note to describe mere absence (e.g. never write "not present" as a status or note) \u2014 absence is communicated only via "present":false. Use "replaces" to merge a newly-identified character with their prior placeholder entry instead of creating a duplicate. Use "role" to record a STABLE descriptor of who/what this character fundamentally is \u2014 their occupation, position, or abilities (e.g. "Academy student", "History teacher", "City Watch detective") \u2014 and ONLY set it the first time this is established, or if it is later revealed to be genuinely different than previously understood; leave it null on every other turn so it is never overwritten by a description of their current action or last appearance. Do not conflate "role" with "note" \u2014 "note" is for relationship/situation/what just happened, "role" is for their enduring identity. If a known character's role is listed as "unknown" above and this narration provides or clearly implies information that would establish it \u2014 even if this isn't their first appearance \u2014 set "role" now to fill that gap. Use "alsoKnownAs" when a character is revealed to have a second, ongoing identity that will continue to be used alongside their current name (e.g. a hero's secret identity) \u2014 both names stay valid and remain displayed together; this is NOT the same as "replaces", which is only for fully retiring a placeholder label (like "Rescued Hostage") that was never really a name in the first place. When referencing an existing character via "name" or "replaces", use exactly ONE of their individual known names \u2014 never a combined form, and never text like "[also known as: ...]" (that bracketed text is display formatting only, never a real name to echo back).\nFor conditions: only add a new condition if this narration clearly shows the player being hurt, weakened, poisoned, cursed, exhausted, or similarly afflicted (negative), or meaningfully buffed/inspired/emboldened (positive) \u2014 never for flavor text alone. Tier guidance for negative conditions: "superficial" = minor and self-resolving with time (bruises, minor scrapes, being winded); "moderate" = notable but treatable with a deliberate action (a real wound, poisoning, being shaken); "severe" = serious, requiring both treatment and time (a broken bone, a deep wound, a serious curse). Positive conditions are understood to last only for the current scene. List a condition in "conditionsResolved" (by its EXACT current label) ONLY when this narration clearly shows the player actively treating, healing, or otherwise resolving it \u2014 not merely time passing. Set "sceneEnded" to true only when a distinct scene/encounter/conversation has just concluded (a chase or fight that moves through several locations still counts as ONE scene; a new conversation, even in the same location as the last, counts as a NEW scene). Do not invent conditions unsupported by the narration.`;
-    const raw = await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",500);
+    const raw = await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",1000);
     const parsed = parseJSON(raw,{questUpdate:{action:"none"},itemsGained:[],itemsLost:[],characterUpdates:[],conditionsGained:[],conditionsResolved:[],sceneEnded:false});
 
     if(parsed.questUpdate && (parsed.questUpdate.action==="set" || parsed.questUpdate.action==="update")){
@@ -1630,7 +1676,7 @@ async function runStep(coreFn,retryKind,retryPayload,replaceIdx){
 
 async function narratorTurnCore(action){
   const pInfo=playerInfo(typeof action==="string"?action:"");
-  const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and active conditions (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the player's active moderate/severe negative conditions (working against them) and positive conditions (working in their favor), using this same single modifier tier. Never let superficial conditions influence this. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true));
+  const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and active conditions (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the player's active moderate/severe negative conditions (working against them) and positive conditions (working in their favor), using this same single modifier tier. Never let superficial conditions influence this. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true),1500);
   const parsed=parseJSON(raw,null);
   if(!parsed || typeof parsed!=="object" || !parsed.resolution){
     if(looksLikeDecline(raw)){
