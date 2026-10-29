@@ -146,7 +146,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.8.2-ratelimit-safe";
+const APP_VERSION="v4.8.3-json-parse-fix";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -638,13 +638,36 @@ function safeParseJSON(input, fallback){
   if(fallback===undefined) fallback=null;
   try{
     const cleanInput = String(input).replace(/```json|```/g,"").trim();
-    return JSON.parse(cleanInput);
+    try{ return JSON.parse(cleanInput); }catch(e1){}
+    /* Smaller models sometimes embed the JSON in prose or leave stray
+       fence markers inside it; fall back to extracting the first
+       balanced {...} block and parsing just that. */
+    const start = cleanInput.indexOf("{");
+    if(start!==-1){
+      let depth=0, inStr=false, esc=false;
+      for(let i=start;i<cleanInput.length;i++){
+        const ch=cleanInput[i];
+        if(esc){ esc=false; continue; }
+        if(inStr){
+          if(ch==="\\") esc=true;
+          else if(ch==='"') inStr=false;
+          continue;
+        }
+        if(ch==='"') inStr=true;
+        else if(ch==="{") depth++;
+        else if(ch==="}"){
+          depth--;
+          if(depth===0) return JSON.parse(cleanInput.slice(start,i+1));
+        }
+      }
+    }
+    throw new Error("no JSON object found in reply");
   }catch(err){
     console.error("safeParseJSON: JSON parsing failed, returning fallback state", err, input);
     return fallback;
   }
 }
-const parseJSON = safeParseJSON; // kept as an alias so existing call sites are unaffected
+const parseJSON = safeParseJSON; // parses model replies: strips fences, returns fallback on failure
 function extractResetTimestamp(errVal){
   let obj=errVal;
   if(typeof obj==="string"){
@@ -953,7 +976,12 @@ function sanitizeDeep(v,depth,c){
   }
   return undefined;
 }
-function safeParseJSON(text,maxChars){
+/* Strict parser for imported files (saves / lorebooks) \u2014 deliberately
+   throws on bad input. Must NOT share a name with the lenient model-reply
+   parser above: duplicate function declarations in the same scope silently
+   shadow each other, which used to route every model reply through this
+   strict path and made all in-game JSON parsing fail. */
+function parseImportJSON(text,maxChars){
   if(typeof text!=="string") throw new Error("File is not text.");
   if(text.length>maxChars) throw new Error("File is too large.");
   if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
@@ -983,7 +1011,7 @@ function validateSave(d){
   }
   return d;
 }
-function parseStoredSave(text){ return validateSave(safeParseJSON(text,SAVE_SIZE_LIMIT_BYTES)); }
+function parseStoredSave(text){ return validateSave(parseImportJSON(text,SAVE_SIZE_LIMIT_BYTES)); }
 
 /* ============================== LOREBOOK ============================== */
 const LORE_DEFAULT_BUDGET=8000, LORE_SCAN_MESSAGES=4;
@@ -1089,7 +1117,7 @@ function loadLorebookFile(ev){
   catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; renderLorebookModal(); ev.target.value=""; return; }
   const reader=new FileReader();
   reader.onload=fev=>{
-    try{ S.lorebook=normalizeLorebook(safeParseJSON(fev.target.result,LORE_FILE_MAX_CHARS)); S.lorebookMsg={ok:true,text:`Loaded "${S.lorebook.name}".`}; }
+    try{ S.lorebook=normalizeLorebook(parseImportJSON(fev.target.result,LORE_FILE_MAX_CHARS)); S.lorebookMsg={ok:true,text:`Loaded "${S.lorebook.name}".`}; }
     catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; }
     persistSession(); renderLorebookModal(); refreshLorebookSetupRow(); ev.target.value="";
   };
@@ -2001,7 +2029,7 @@ function handleImportFile(ev){
   const reader=new FileReader();
   reader.onload=async(fev)=>{
     let d;
-    try{ d=validateSave(safeParseJSON(fev.target.result,SAVE_SIZE_LIMIT_BYTES)); }
+    try{ d=validateSave(parseImportJSON(fev.target.result,SAVE_SIZE_LIMIT_BYTES)); }
     catch(e){ S.importStatus=/large/.test(e.message)?"too_large":"error"; render(); ev.target.value=""; return; }
     try{
       const id=newId();
