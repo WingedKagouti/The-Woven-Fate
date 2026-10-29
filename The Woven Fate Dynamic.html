@@ -146,7 +146,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.8.8-lore-panel";
+const APP_VERSION="v4.8.9-json-sanitize";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -700,10 +700,31 @@ function repairTruncatedJson(s){
   }
   return undefined;
 }
+function sanitizeJsonStrings(s){
+  /* Small models sometimes emit raw control characters (a literal newline or
+     tab) inside JSON string values. That is invalid JSON \u2014 and worse, it
+     makes the truncation-repair salvage believe the reply was cut off. This
+     scans with proper string/escape state and escapes control chars inside
+     string values only. No-op on already-valid JSON. */
+  let out="", inStr=false, esc=false;
+  for(let i=0;i<s.length;i++){
+    const ch=s[i], c=s.charCodeAt(i);
+    if(esc){ out+=ch; esc=false; continue; }
+    if(inStr){
+      if(ch==="\\"){ out+=ch; esc=true; continue; }
+      if(ch==="\""){ inStr=false; out+=ch; continue; }
+      if(c<0x20){ out += ch==="\n"?"\\n" : ch==="\t"?"\\t" : ch==="\r"?"\\r" : "\\u"+c.toString(16).padStart(4,"0"); continue; }
+      out+=ch; continue;
+    }
+    if(ch==="\"") inStr=true;
+    out+=ch;
+  }
+  return out;
+}
 function safeParseJSON(input, fallback){
   if(fallback===undefined) fallback=null;
   try{
-    const raw = String(input);
+    const raw = sanitizeJsonStrings(String(input));
     /* Attempt 1: drop stray fence markers, parse the whole text. */
     const stripped = raw.replace(/```json|```/g,"").trim();
     try{ return JSON.parse(stripped); }catch(e1){}
