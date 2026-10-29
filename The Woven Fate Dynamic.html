@@ -146,7 +146,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.8.3-json-parse-fix";
+const APP_VERSION="v4.8.5-setup-robustness";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -634,33 +634,52 @@ async function callClaude(messages,system,maxTokens){
 function safeHostname(url){
   try{ return new URL(url).hostname; }catch(e){ return ""; }
 }
-function safeParseJSON(input, fallback){
-  if(fallback===undefined) fallback=null;
-  try{
-    const cleanInput = String(input).replace(/```json|```/g,"").trim();
-    try{ return JSON.parse(cleanInput); }catch(e1){}
-    /* Smaller models sometimes embed the JSON in prose or leave stray
-       fence markers inside it; fall back to extracting the first
-       balanced {...} block and parsing just that. */
-    const start = cleanInput.indexOf("{");
-    if(start!==-1){
-      let depth=0, inStr=false, esc=false;
-      for(let i=start;i<cleanInput.length;i++){
-        const ch=cleanInput[i];
-        if(esc){ esc=false; continue; }
-        if(inStr){
-          if(ch==="\\") esc=true;
-          else if(ch==='"') inStr=false;
-          continue;
-        }
-        if(ch==='"') inStr=true;
-        else if(ch==="{") depth++;
-        else if(ch==="}"){
-          depth--;
-          if(depth===0) return JSON.parse(cleanInput.slice(start,i+1));
+function extractFirstJsonObject(s){
+  /* Scans s for the first {...} block that is both balanced (braces inside
+     string values ignored) and parseable, and returns the parsed value.
+     Returns undefined if none is found. */
+  for(let start=s.indexOf("{"); start!==-1; start=s.indexOf("{",start+1)){
+    let depth=0, inStr=false, esc=false;
+    for(let i=start;i<s.length;i++){
+      const ch=s[i];
+      if(esc){ esc=false; continue; }
+      if(inStr){
+        if(ch==="\\") esc=true;
+        else if(ch==='"') inStr=false;
+        continue;
+      }
+      if(ch==='"') inStr=true;
+      else if(ch==="{") depth++;
+      else if(ch==="}"){
+        depth--;
+        if(depth===0){
+          try{ return JSON.parse(s.slice(start,i+1)); }catch(e){ break; }
         }
       }
     }
+  }
+  return undefined;
+}
+function safeParseJSON(input, fallback){
+  if(fallback===undefined) fallback=null;
+  try{
+    const raw = String(input);
+    /* Attempt 1: drop stray fence markers, parse the whole text. */
+    const stripped = raw.replace(/```json|```/g,"").trim();
+    try{ return JSON.parse(stripped); }catch(e1){}
+    /* Attempt 2: small models sometimes embed a WHOLE fenced code block
+       (raw newlines, unescaped quotes) inside a string value, which is
+       structurally invalid JSON. Removing such blocks entirely leaves a
+       valid object with the damaged value emptied out. Tried before blind
+       brace extraction, so an embedded garbage object is never mistaken
+       for the reply itself. */
+    const deblocked = raw.replace(/```[a-zA-Z]*\n?[\s\S]*?```/g,"").replace(/```[a-zA-Z]*\n?/g,"").trim();
+    try{ return JSON.parse(deblocked); }catch(e2){}
+    /* Attempt 3: extract the first balanced {...} block from either text. */
+    let ex = extractFirstJsonObject(stripped);
+    if(ex!==undefined) return ex;
+    ex = extractFirstJsonObject(deblocked);
+    if(ex!==undefined) return ex;
     throw new Error("no JSON object found in reply");
   }catch(err){
     console.error("safeParseJSON: JSON parsing failed, returning fallback state", err, input);
@@ -1235,18 +1254,40 @@ function handleRandom(){
   });
 }
 
+/* Small models sometimes return the kit as an array of strings or objects
+   instead of the single comma-separated string the prompt asks for; accept
+   those shapes and fold them into one string. */
+function normalizeKit(kit){
+  if(typeof kit==="string") return kit.trim();
+  if(Array.isArray(kit)){
+    const bits=[];
+    for(const x of kit){
+      if(typeof x==="string"){ if(x.trim()) bits.push(x.trim()); }
+      else if(x && typeof x==="object"){
+        const name = (x.item||x.name||x.gear) ? String(x.item||x.name||x.gear).trim() : "";
+        const desc = (x.desc||x.description||x.note) ? String(x.desc||x.description||x.note).trim() : "";
+        if(name) bits.push(desc && desc!==name ? `${name} (${desc})` : name);
+        else if(desc) bits.push(desc);
+      }
+    }
+    return bits.join(", ");
+  }
+  return "";
+}
 async function deriveTools(genderV,descV,settingV,engineV){
   const sObj = SETTINGS.find(x=>x.key===settingV);
   const sl = sObj ? sObj.label : settingV;
   const eObj = ENGINES.find(x=>x.key===engineV);
   const el = eObj ? eObj.label : engineV;
   try{
-    const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer a plausible occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then list 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin). Return ONLY raw JSON: {"occupation":"...","kit":"..."}`}],"Respond ONLY with raw JSON, no markdown.",200);
+    const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer ONE occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then pick 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin).\n\nRespond with ONLY this JSON object and nothing else:\n{"occupation":"<job title, max 6 words, no explanation>","kit":"<comma-separated list of the 2-4 items, each a short noun phrase of max 6 words>"}\nRules: "occupation" must be a short job title only. "kit" must be a single string \u2014 NEVER an array, NEVER nested objects. No markdown, no commentary, no fields beyond these two.`}],"Respond ONLY with raw JSON, no markdown.",500);
     const parsed = parseJSON(raw,null);
-    if(!parsed || typeof parsed.occupation!=="string" || !parsed.occupation.trim() || typeof parsed.kit!=="string" || !parsed.kit.trim()){
+    const occupation = (parsed && typeof parsed.occupation==="string") ? parsed.occupation.trim().slice(0,120) : "";
+    const kit = normalizeKit(parsed ? parsed.kit : undefined).slice(0,400);
+    if(!occupation || !kit){
       return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
     }
-    return parsed;
+    return {occupation,kit};
   }catch(e){
     return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
   }
@@ -1255,7 +1296,7 @@ async function deriveTools(genderV,descV,settingV,engineV){
 async function deriveCharacterNames(descV){
   if(!descV || !descV.trim()) return [];
   try{
-    const raw = await callClaude([{role:"user",content:`Character description: "${descV.trim()}"\n\nExtract any name(s) explicitly given for this character \u2014 civilian name, hero/code name, alias, callsign, etc. Only include names actually stated in the text; do not invent one. Return ONLY raw JSON: {"names":["Name1","Name2"]} (empty array if no name is given).`}],"Respond ONLY with raw JSON, no markdown.",150);
+    const raw = await callClaude([{role:"user",content:`Character description: "${descV.trim()}"\n\nExtract any name(s) explicitly given for this character \u2014 civilian name, hero/code name, alias, callsign, etc. Only include names actually stated in the text; do not invent one. Return ONLY raw JSON: {"names":["Name1","Name2"]} (empty array if no name is given).`}],"Respond ONLY with raw JSON, no markdown.",300);
     const parsed = parseJSON(raw,null);
     if(parsed && Array.isArray(parsed.names)) return parsed.names.filter(n=>typeof n==="string"&&n.trim()).slice(0,3);
   }catch(e){}
