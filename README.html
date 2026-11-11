@@ -76,253 +76,675 @@ footer a { color: var(--textM); }
   <header>
     <a class="back" href="index.html">&#8592; Index</a>
     <h1>The Woven Fate</h1>
-    <p class="tagline">An AI-narrated, text-based RPG that runs entirely in your browser, plus the tools for preparing and testing the lorebooks that feed it.</p>
+    <p class="tagline">An AI-narrated, text-based RPG that runs entirely in your browser, plus the tools for preparing, editing, and testing the lorebooks and rulebooks that feed it.</p>
   </header>
 
-  <p>Everything here is a <strong>single, self-contained HTML file</strong>. There is no build step, no server, and nothing to install. Download a file and open it in a modern browser.</p>
-
-  <h3>What's in the box</h3>
+  <p>Everything here is a <strong>single, self-contained HTML file</strong>. There is no build step, no server, and nothing to install. Download a file and open it in a modern browser. <code>index.html</code> is a start page that links to everything.</p>
+  <h2 id="contents">Contents</h2>
+  <ul>
+  <li><a href="#whats-in-the-box">What's in the box</a></li>
+  <li><a href="#the-woven-fate">The Woven Fate (the game)</a></li>
+  <li><a href="#the-woven-fate-dynamic">The Woven Fate: Dynamic</a></li>
+  <li><a href="#rulebooks">Rulebooks</a></li>
+  <li><a href="#lorebook-format">Lorebook format</a></li>
+  <li><a href="#woven-fate-editor">Woven Fate Editor</a></li>
+  <li><a href="#lorebook-converter">Lorebook Converter</a></li>
+  <li><a href="#lorebook-test-editor">Lorebook Test Editor</a></li>
+  <li><a href="#lorebook-testbench">Lorebook Testbench</a></li>
+  <li><a href="#privacy-and-storage">Privacy and storage</a></li>
+  <li><a href="#requirements">Requirements</a></li>
+  </ul>
+  <h2 id="whats-in-the-box">What's in the box</h2>
   <table>
-    <tr><th>File</th><th>What it is</th></tr>
-    <tr><td><code>The Woven Fate.html</code></td><td>The game. Story memory is a running journal and chapter &ldquo;books&rdquo;.</td></tr>
-    <tr><td><code>The Woven Fate Dynamic.html</code></td><td>The same game, with the journal replaced by a <strong>dynamic lorebook</strong> the AI writes and maintains as you play.</td></tr>
-    <tr><td><code>Lorebook Converter.html</code></td><td>Converts lorebooks from other tools into the Woven format.</td></tr>
-    <tr><td><code>Lorebook Test Editor.html</code></td><td>A form-based editor for writing and validating the test scenes the Testbench reads.</td></tr>
-    <tr><td><code>Lorebook Testbench.html</code></td><td>Offline analysis of how a lorebook behaves against sample scenes and a character budget.</td></tr>
+  <thead>
+  <tr>
+  <th>File</th>
+  <th>What it is</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td><code>index.html</code></td>
+  <td>Start page linking to every tool and to this README.</td>
+  </tr>
+  <tr>
+  <td><code>The Woven Fate.html</code></td>
+  <td>The game. Story memory is a running journal and chapter "books".</td>
+  </tr>
+  <tr>
+  <td><code>The Woven Fate Dynamic.html</code></td>
+  <td>The same game, with the journal replaced by a <strong>dynamic lorebook</strong> the AI writes and maintains as you play.</td>
+  </tr>
+  <tr>
+  <td><code>Woven Fate Editor.html</code></td>
+  <td>A form-based editor for writing, checking, and exporting <strong>lorebooks and rulebooks</strong>.</td>
+  </tr>
+  <tr>
+  <td><code>Lorebook Converter.html</code></td>
+  <td>Converts lorebooks from other tools into the Woven format.</td>
+  </tr>
+  <tr>
+  <td><code>Lorebook Test Editor.html</code></td>
+  <td>A form-based editor for writing and validating the test scenes the Testbench reads.</td>
+  </tr>
+  <tr>
+  <td><code>Lorebook Testbench.html</code></td>
+  <td>Offline analysis of how a lorebook behaves against sample scenes and a character budget.</td>
+  </tr>
+  <tr>
+  <td><code>README.md</code>, <code>README.html</code></td>
+  <td>This document, in two formats.</td>
+  </tr>
+  <tr>
+  <td><code>License.txt</code></td>
+  <td>The Woven Fate License.</td>
+  </tr>
+  </tbody>
   </table>
-
+  <p>There are two kinds of "book" you can load into the game, and they do different jobs:</p>
+  <table>
+  <thead>
+  <tr>
+  <th></th>
+  <th>Lorebook</th>
+  <th>Rulebook</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td>Purpose</td>
+  <td>Facts the narrator should know: places, people, rules of the world</td>
+  <td>Meters that track the story (health, trust, money, time, dice…) and tell the narrator how to behave at each level</td>
+  </tr>
+  <tr>
+  <td>Triggered by</td>
+  <td>Keywords appearing in the recent story</td>
+  <td>Your actions, the AI's judgement, the clock, dice, and other meters</td>
+  </tr>
+  <tr>
+  <td>File</td>
+  <td><code>.json</code>, see <a href="#lorebook-format">Lorebook format</a></td>
+  <td><code>.json</code>, schema <code>rulebook/v1-draft</code>, see <a href="#rulebooks">Rulebooks</a></td>
+  </tr>
+  <tr>
+  <td>Made with</td>
+  <td>Converter or Editor</td>
+  <td>Editor</td>
+  </tr>
+  </tbody>
+  </table>
   <p>A typical workflow:</p>
   <ol>
-    <li><strong>Convert</strong> an existing lorebook with the Converter (or write one by hand).</li>
-    <li><strong>Write test scenes</strong> in the Test Editor: short passages that should trigger particular entries.</li>
-    <li><strong>Test</strong> the lorebook against those scenes in the Testbench to see which entries fire and which get squeezed out by the budget.</li>
-    <li><strong>Play</strong> it in The Woven Fate (or the Dynamic variant).</li>
+  <li><strong>Convert</strong> an existing lorebook with the Converter, or <strong>write</strong> one (and any rulebook) in the Woven Fate Editor.</li>
+  <li><strong>Write test scenes</strong> in the Test Editor: short passages that should trigger particular entries.</li>
+  <li><strong>Test</strong> the lorebook against those scenes in the Testbench to see which entries fire and which get squeezed out by the budget.</li>
+  <li><strong>Preview</strong> a rulebook in the Editor's Preview &amp; test page to check its levels and what the narrator will be told.</li>
+  <li><strong>Play</strong> it in The Woven Fate (or the Dynamic variant).</li>
   </ol>
-
-  <h2>The Woven Fate</h2>
+  <hr />
+  <h2 id="the-woven-fate">The Woven Fate</h2>
+  <p><em>(<code>The Woven Fate.html</code>)</em></p>
   <p>You describe what your character does. An AI game master narrates the result in second person.</p>
-
-  <h3>Getting started</h3>
+  <h3 id="getting-started">Getting started</h3>
   <ol>
-    <li>Open the file and choose <strong>+ Add API Target</strong> (or the &#9881; icon).</li>
-    <li>Pick a service type, enter the URL and your API key, and save. A model name is optional and overrides the default.</li>
-    <li>On the setup screen pick a <strong>setting</strong>, a <strong>plot engine</strong>, a <strong>mood</strong>, and optionally a character gender and description. <strong>Random &#9856;</strong> picks for you.</li>
-    <li>Optionally load a lorebook with <strong>&#128214; Load / manage</strong>.</li>
-    <li>Press begin and start acting.</li>
+  <li>Open the file and choose <strong>+ Add API Target</strong> (or the ⚙ icon).</li>
+  <li>Pick a service type, enter the URL and your API key, and save. A model name is optional and overrides the default.</li>
+  <li>On the setup screen pick a <strong>setting</strong>, a <strong>plot engine</strong>, a <strong>mood</strong>, and optionally a character gender and description. <strong>Random ⚄</strong> picks for you.</li>
+  <li>Optionally load a lorebook with <strong>📖 Load / manage</strong>, and a rulebook with the <strong>Rulebook → Load / manage</strong> button below it. Without one, the built-in <em>Health &amp; Fatigue</em> rulebook is used.</li>
+  <li>Press begin and start acting.</li>
   </ol>
-
-  <h3>Supported API services</h3>
+  <h3 id="supported-api-services">Supported API services</h3>
   <p>Anthropic (Claude), OpenAI (GPT), Google Gemini, Groq, Mistral, DeepSeek, xAI (Grok), OpenRouter, Together AI, Fireworks AI, and any OpenAI-compatible endpoint (Ollama, LM Studio, custom proxies). You can save several named targets and switch between them. The default model is <code>claude-sonnet-4-6</code>.</p>
   <p>Calls go <strong>directly from your browser</strong> to the service you choose. There is no backend proxy. Local or self-hosted endpoints may need CORS enabled.</p>
-
-  <h3>Story options</h3>
+  <h3 id="story-options">Story options</h3>
   <ul>
-    <li><strong>Settings (9):</strong> Contemporary, Urban Fantasy, High Fantasy, Folk &amp; Myth, Steampunk, Sci-Fi, Western, Historical, School &amp; Academy</li>
-    <li><strong>Plot engines (12):</strong> Story-Driven, Detective &amp; Mystery, Crime, Spy &amp; Espionage, Action, Adventure, Superhero, Gothic Horror, Cosmic Horror, Monster Horror, Swashbuckling, Political Intrigue</li>
-    <li><strong>Moods (8):</strong> Tragic, Dark, Neutral, Whimsical, Comedic, Romantic, Mysterious, Heroic</li>
+  <li><strong>Settings (9):</strong> Contemporary, Urban Fantasy, High Fantasy, Folk &amp; Myth, Steampunk, Sci-Fi, Western, Historical, School &amp; Academy</li>
+  <li><strong>Plot engines (12):</strong> Story-Driven, Detective &amp; Mystery, Crime, Spy &amp; Espionage, Action, Adventure, Superhero, Gothic Horror, Cosmic Horror, Monster Horror, Swashbuckling, Political Intrigue</li>
+  <li><strong>Moods (8):</strong> Tragic, Dark, Neutral, Whimsical, Comedic, Romantic, Mysterious, Heroic</li>
   </ul>
-
-  <h3>How a turn works</h3>
+  <h3 id="how-a-turn-works">How a turn works</h3>
   <p>For each action you type, the game master decides one of three things:</p>
   <ul>
-    <li><strong>Narrative:</strong> nothing is at stake, so the story simply continues.</li>
-    <li><strong>Item resolution:</strong> a specific carried item plausibly solves the problem and is used up.</li>
-    <li><strong>Challenge:</strong> something meaningful is at risk, so Fate gets a say.</li>
+  <li><strong>Narrative:</strong> nothing is at stake, so the story simply continues.</li>
+  <li><strong>Item resolution:</strong> a specific carried item plausibly solves the problem and is used up.</li>
+  <li><strong>Challenge:</strong> something meaningful is at risk, so Fate gets a say.</li>
   </ul>
   <p>On a challenge you are shown three face-down buttons: <strong>Fortune Smiles</strong>, <strong>Fate Turns Away</strong>, and <strong>The Weave</strong>. The mix depends on how well your gear, skills, and conditions suit the task:</p>
   <table>
-    <tr><th>Situation</th><th>Buttons on offer</th></tr>
-    <tr><td>Neutral odds</td><td>Fortune Smiles, Fate Turns Away, The Weave</td></tr>
-    <tr><td>Favourable</td><td>Fortune Smiles, The Weave, The Weave</td></tr>
-    <tr><td>Unfavourable</td><td>Fate Turns Away, The Weave, The Weave</td></tr>
+  <thead>
+  <tr>
+  <th>Situation</th>
+  <th>Buttons on offer</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td>Neutral odds</td>
+  <td>Fortune Smiles, Fate Turns Away, The Weave</td>
+  </tr>
+  <tr>
+  <td>Favourable</td>
+  <td>Fortune Smiles, The Weave, The Weave</td>
+  </tr>
+  <tr>
+  <td>Unfavourable</td>
+  <td>Fate Turns Away, The Weave, The Weave</td>
+  </tr>
+  </tbody>
   </table>
   <p>The positions are shuffled. The Weave is a wildcard that resolves to a random one of the four outcomes below.</p>
   <table>
-    <tr><th>Outcome</th><th>Meaning</th></tr>
-    <tr><td>Victory</td><td>Complete triumph</td></tr>
-    <tr><td>Costly Victory</td><td>Won, but at a price</td></tr>
-    <tr><td>Near Miss</td><td>Failed, but not broken</td></tr>
-    <tr><td>Defeat</td><td>Total failure</td></tr>
+  <thead>
+  <tr>
+  <th>Outcome</th>
+  <th>Meaning</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td>Victory</td>
+  <td>Complete triumph</td>
+  </tr>
+  <tr>
+  <td>Costly Victory</td>
+  <td>Won, but at a price</td>
+  </tr>
+  <tr>
+  <td>Near Miss</td>
+  <td>Failed, but not broken</td>
+  </tr>
+  <tr>
+  <td>Defeat</td>
+  <td>Total failure</td>
+  </tr>
+  </tbody>
   </table>
   <p>The AI then narrates the chosen outcome.</p>
-
-  <h3>Tracked state</h3>
+  <h3 id="tracked-state">Tracked state</h3>
   <p>After each narration, the game extracts and tracks:</p>
   <ul>
-    <li>Your current <strong>quest</strong> and completed quests</li>
-    <li><strong>Key items</strong> and <strong>general items</strong> (gained and lost)</li>
-    <li><strong>Tools of the Trade</strong>, a baseline kit derived from your character</li>
-    <li><strong>Characters</strong> you meet, including role, status (ally, hostile, romantic, and so on), aliases, and merges</li>
-    <li><strong>Conditions</strong>: superficial, moderate, severe, and positive. Moderate and severe conditions, and positive ones, feed back into later challenge odds.</li>
+  <li>Your current <strong>quest</strong> and completed quests</li>
+  <li><strong>Key items</strong> and <strong>general items</strong> (gained and lost)</li>
+  <li><strong>Tools of the Trade</strong>, a baseline kit derived from your character</li>
+  <li><strong>Characters</strong> you meet, including role, status (ally, hostile, romantic, and so on), aliases, and merges</li>
   </ul>
-
-  <h3>Other features</h3>
+  <p>Your character's physical and emotional state (health, fatigue, trust, and anything else you define) is handled by the <strong>rulebook</strong>, shown as meters above the story. See <a href="#rulebooks">Rulebooks</a>.</p>
+  <h3 id="other-features">Other features</h3>
   <ul>
-    <li><strong>Suggestions</strong> for what to do next, with re-roll</li>
-    <li><strong>Continue the story</strong> and <strong>Regenerate</strong> for the last response</li>
-    <li><strong>Books:</strong> when enough has happened the game offers to close a chapter, summarise it, and carry the summary forward</li>
-    <li><strong>Saves:</strong> manual saves, an <strong>autosave</strong> (every 5 turns, toggleable), rename, delete, and export/import as JSON</li>
-    <li>Light and dark themes</li>
-    <li>A <strong>Debug stats</strong> toggle that shows lorebook and API stats under each response</li>
+  <li><strong>Suggestions</strong> for what to do next, with re-roll</li>
+  <li><strong>Continue the story</strong> and <strong>Regenerate</strong> for the last response. Continue also runs the rulebook, because the last reply can change the meters.</li>
+  <li><strong>Books:</strong> when enough has happened the game offers to close a chapter, summarise it, and carry the summary forward</li>
+  <li><strong>Saves:</strong> manual saves, an <strong>autosave</strong> (every 5 turns, toggleable), rename, delete, and export/import as JSON. Meter values are part of the save.</li>
+  <li>Light and dark themes</li>
+  <li>A <strong>Settings hub</strong> (the ⚙ icon) that gathers the API target, the lorebook, the rulebook, and the <strong>Debug stats</strong> toggle, which shows lorebook, rulebook, and API stats under each response</li>
   </ul>
-
-  <h3>Lorebooks in the game</h3>
+  <h3 id="lorebooks-in-the-game">Lorebooks in the game</h3>
   <p>A lorebook is a JSON file (see <a href="#lorebook-format">Lorebook format</a>). On every turn the game scans the <strong>last 4 messages plus your current action</strong> for entry keys, then adds matching entries to the narrator's context until the <strong>character budget</strong> runs out. The budget can be adjusted in the lorebook dialog. The narrator is told to treat lore as canon but never to quote it or mention a lorebook.</p>
-
-  <h2 id="woven-fate-dynamic">The Woven Fate: Dynamic</h2>
-  <p>Identical gameplay, with a different long-term memory system.</p>
+  <p>Files you load are checked first: oversized files, control characters, and unsafe keys are rejected or cleaned, and entries without keys or content are dropped.</p>
+  <hr />
+  <h2 id="the-woven-fate-dynamic">The Woven Fate: Dynamic</h2>
+  <p><em>(<code>The Woven Fate Dynamic.html</code>)</em></p>
+  <p>Identical gameplay, rulebooks included, with a different long-term memory system.</p>
   <table>
-    <tr><th></th><th>Standard</th><th>Dynamic</th></tr>
-    <tr><td>Story memory</td><td>Journal of events + chapter books</td><td>AI-maintained <strong>story-so-far</strong> summary + <strong>dynamic lorebook</strong></td></tr>
-    <tr><td>Extra AI call per turn</td><td>no</td><td>yes (the memory update)</td></tr>
-    <tr><td>Memory budget</td><td>n/a</td><td><strong>Story lore budget</strong>, default 4,000 chars (Settings &#9881;), separate from the static lorebook</td></tr>
-    <tr><td>Chat history window</td><td>20 messages</td><td>15 messages</td></tr>
+  <thead>
+  <tr>
+  <th></th>
+  <th>Standard</th>
+  <th>Dynamic</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td>Story memory</td>
+  <td>Journal of events + chapter books</td>
+  <td>AI-maintained <strong>story-so-far</strong> summary + <strong>dynamic lorebook</strong></td>
+  </tr>
+  <tr>
+  <td>Extra AI call per turn</td>
+  <td>no</td>
+  <td>yes (the memory update)</td>
+  </tr>
+  <tr>
+  <td>Memory budget</td>
+  <td>n/a</td>
+  <td><strong>Story lore budget</strong>, default 4,000 chars (Settings ⚙), separate from the static lorebook</td>
+  </tr>
+  <tr>
+  <td>Chat history window</td>
+  <td>20 messages</td>
+  <td>15 messages</td>
+  </tr>
+  </tbody>
   </table>
-  <p>After each turn the AI is asked to update a rolling summary (up to 1,500 characters) and to create or revise entries for people, places, and things that have appeared (up to 150 entries, 600 characters each). These entries are keyed by name and fire like any other lorebook entry, so the game remembers things <em>when they become relevant</em> rather than carrying everything all the time. The story-so-far is always included and is charged to the dynamic budget first.</p>
+  <p>After each turn the AI is asked to update a rolling summary (up to 1,500 characters) and to create or revise entries for people, places, and things that have appeared (up to 150 entries, 600 characters each). These entries are keyed by name and fire like any other lorebook entry, so the game remembers things <em>when they become relevant</em> rather than carrying everything all the time. The story-so-far is always included and is charged to the dynamic budget first. The <strong>Lore</strong> panel lets you browse the entries and the story-so-far.</p>
   <ul>
-    <li>If a memory update fails, it is retried together with the next turn.</li>
-    <li>Your own static lorebook still works alongside it, with its own budget.</li>
-    <li>Because it makes an additional API call each turn, it costs somewhat more and is slower per turn than the standard version.</li>
-    <li>Dynamic lore is stored inside your saves. Saves from the standard version can be loaded; their journal and book content is used to seed the story-so-far.</li>
+  <li>If a memory update fails, it is retried together with the next turn.</li>
+  <li>Your own static lorebook still works alongside it, with its own budget.</li>
+  <li>Because it makes an additional API call each turn, it costs somewhat more and is slower per turn than the standard version.</li>
+  <li>Dynamic lore is stored inside your saves. Saves from the standard version can be loaded; their journal and book content is used to seed the story-so-far.</li>
   </ul>
   <p>Pick Dynamic for long campaigns where continuity matters. Pick the standard version for cheaper, simpler sessions.</p>
-
+  <hr />
+  <h2 id="rulebooks">Rulebooks</h2>
+  <p>A <strong>rulebook</strong> is a set of <strong>meters</strong> that track things about the story, plus rules for how they change and what the narrator is told at each level. It replaces the old fixed "conditions" list. One rulebook is active at a time. You can edit one in the <a href="#woven-fate-editor">Woven Fate Editor</a>.</p>
+  <h3 id="loading-a-rulebook">Loading a rulebook</h3>
+  <p>Open <strong>Rulebook → Load / manage</strong> on the setup screen, or <strong>⚙ Settings → Rulebook</strong> during play. Choose <strong>Load rulebook…</strong> and pick a <code>.json</code> file. The game checks it against the schema and tells you what is wrong if it is refused. <strong>Use built-in</strong> returns to <em>Health &amp; Fatigue</em> (a Health pip meter and a Fatigue bar).</p>
+  <p>The same dialog has a <strong>Character name</strong> field. It sets what <code>{{char}}</code> means in the rulebook's instructions. Leave it blank and it means the character the scene focuses on. <code>{{user}}</code> always means the player (shown as "you" on screen). Changes apply from the next message.</p>
+  <h3 id="what-happens-each-turn">What happens each turn</h3>
+  <p>After each message you send (and each press of Continue) the rulebook runs in this order:</p>
+  <ol>
+  <li><strong>Dice</strong> set to roll <em>before the reply</em> are rolled.</li>
+  <li><strong>Keyword rules</strong> are checked against your message.</li>
+  <li><strong>AI checks</strong> (an extra short call) answer the rulebook's yes/no questions about what just happened, and may detect time skips, item changes, and journal events.</li>
+  <li><strong>Decay and the clock</strong> step, if nothing else changed a meter.</li>
+  <li><strong>Dice</strong> set to roll <em>after the meters</em> are rolled.</li>
+  <li><strong>Triggers</strong> run, reacting to the new values.</li>
+  <li>The <strong>narrator</strong> is told the instruction of the level each meter is in, plus any combined rules that apply.</li>
+  </ol>
+  <p>If a call fails or you retry, the game restores the meters to where they were, so a retry doesn't count twice.</p>
+  <h3 id="meter-types">Meter types</h3>
+  <table>
+  <thead>
+  <tr>
+  <th>Type</th>
+  <th>What it is</th>
+  <th>Typical use</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td><strong>Bar</strong></td>
+  <td>A value in a range, drawn as a bar</td>
+  <td>Energy, trust, attraction</td>
+  </tr>
+  <tr>
+  <td><strong>Pips</strong></td>
+  <td>A small count drawn as icons</td>
+  <td>Health, lives, charges</td>
+  </tr>
+  <tr>
+  <td><strong>Number</strong></td>
+  <td>Any number, with optional unit and decimals</td>
+  <td>Money, score, days</td>
+  </tr>
+  <tr>
+  <td><strong>Story clock</strong></td>
+  <td>Date and time in the story</td>
+  <td>Day and night, deadlines, seasons</td>
+  </tr>
+  <tr>
+  <td><strong>Dice</strong></td>
+  <td>A die (2–1000 sides) rolled on conditions you set</td>
+  <td>Luck, random events</td>
+  </tr>
+  <tr>
+  <td><strong>Select</strong></td>
+  <td>One of several states, switched as the story moves</td>
+  <td>Location, mood, disguise</td>
+  </tr>
+  <tr>
+  <td><strong>Collection</strong></td>
+  <td>Held items and counted amounts</td>
+  <td>Inventory, ammunition</td>
+  </tr>
+  <tr>
+  <td><strong>Journal</strong></td>
+  <td>Events that have happened, remembered by the narrator</td>
+  <td>Promises made, secrets learned</td>
+  </tr>
+  </tbody>
+  </table>
+  <p>Every meter has a name, icon, and colour, and chooses <strong>which text the AI reads</strong> for it (your messages, the character's behaviour, or both). It can be shown to the player or hidden, and in the HUD strip, the panel only, or nowhere. It can list "what raises it" and "what lowers it" for the player, and can <strong>tell the narrator the exact value</strong> instead of just the level.</p>
+  <h3 id="levels">Levels</h3>
+  <p>Bars, pips, numbers, dice, and the clock's time-of-day and day-number parts are divided into <strong>levels</strong> (2 to 12). Each level has:</p>
+  <ul>
+  <li>a <strong>name</strong> and an <strong>upper limit</strong> (the last level may have none),</li>
+  <li>an <strong>instruction</strong> for the narrator ("{{char}} is wary and keeps their distance…"),</li>
+  <li>a <strong>caption</strong> shown to the player,</li>
+  <li><strong>Shown to the player</strong>, which can hide a level's name and caption until reached,</li>
+  <li><strong>Override</strong>, which makes that level's instruction take priority over what the player asks the character to do. Use it for states like unconsciousness.</li>
+  </ul>
+  <h3 id="what-changes-a-meter">What changes a meter</h3>
+  <table>
+  <thead>
+  <tr>
+  <th>Mechanism</th>
+  <th>How it works</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td><strong>Keyword rules</strong></td>
+  <td>Words in <em>your</em> message (matched like lorebook keys, <code>*</code> wildcard) add to or set the value.</td>
+  </tr>
+  <tr>
+  <td><strong>AI checks</strong></td>
+  <td>Yes/no questions ("Does {{user}} comfort {{char}}?") that add, set, multiply, divide, or roll a random amount. Each has a cooldown and can be limited to when other meters match. Alternatively the AI <strong>extracts</strong> a signed amount directly. Per-turn limits cap how far one reply can move a meter, and <em>Negative wins</em> settles replies that trigger both a rise and a fall.</td>
+  </tr>
+  <tr>
+  <td><strong>Decay / per-message change</strong></td>
+  <td>A bar drifts after quiet turns; a number can change every message.</td>
+  </tr>
+  <tr>
+  <td><strong>Triggers</strong></td>
+  <td>On a bar, pips, or number meter: when <em>other</em> meters meet conditions, change this one (for example, "when Wallet reaches 0, set Broke to 1"). They fire when the condition becomes true, every turn, every N turns, or once. They never set off each other.</td>
+  </tr>
+  <tr>
+  <td><strong>Combined rules</strong></td>
+  <td>When several meters' conditions all hold at once, the narrator gets an extra instruction (for example, "trust is high <strong>and</strong> it is night").</td>
+  </tr>
+  <tr>
+  <td><strong>The clock</strong></td>
+  <td>Moves a set number of minutes per message and can notice time skips ("the next morning").</td>
+  </tr>
+  <tr>
+  <td><strong>Dice</strong></td>
+  <td>Roll every message, every N messages, on keywords, on AI questions, when meters are in a state, or when a meter rises. The result lasts until the next roll or for a set number of messages.</td>
+  </tr>
+  <tr>
+  <td><strong>Player editing</strong></td>
+  <td>If <em>Player can edit this</em> is on, you can change the value yourself: click an option for a Select, or click the value for other types (a calendar picker for dates, numbers for time).</td>
+  </tr>
+  </tbody>
+  </table>
+  <p>Conditions can test meter values, the story day or time of day, the weekday or date, which option is selected, how much of an item is held, and how long ago a journal event happened.</p>
+  <h3 id="seeing-the-meters">Seeing the meters</h3>
+  <p>The meters appear above the story in three views, switched from the HUD: <strong>Minimal</strong> (small value chips with a hover card), <strong>Expanded</strong> (cards with levels and captions), and the open <strong>Meters panel</strong> with everything. Up to 8 meters show in the strip. There are 86 icons and 28 colours to choose from.</p>
+  <h3 id="limits">Limits</h3>
+  <table>
+  <thead>
+  <tr>
+  <th></th>
+  <th></th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td>Meters per rulebook</td>
+  <td>15 (only one story clock)</td>
+  </tr>
+  <tr>
+  <td>Levels per meter</td>
+  <td>2–12</td>
+  </tr>
+  <tr>
+  <td>Keyword rules / words per rule</td>
+  <td>20 / 50</td>
+  </tr>
+  <tr>
+  <td>AI questions per meter</td>
+  <td>60</td>
+  </tr>
+  <tr>
+  <td>Items per Select / Collection / Journal</td>
+  <td>20 / 20 / 30</td>
+  </tr>
+  <tr>
+  <td>Rules per Collection / Journal</td>
+  <td>20 each</td>
+  </tr>
+  <tr>
+  <td>Combined rules</td>
+  <td>30</td>
+  </tr>
+  <tr>
+  <td>Triggers per meter</td>
+  <td>10</td>
+  </tr>
+  <tr>
+  <td>Instruction / caption length</td>
+  <td>600 / 120 characters</td>
+  </tr>
+  <tr>
+  <td>File size</td>
+  <td>about 1.5 MB</td>
+  </tr>
+  </tbody>
+  </table>
+  <h3 id="rulebook-format">Rulebook format</h3>
+  <p>A rulebook file looks like this (shortened):</p>
+  <pre><code class="language-json">{
+    &quot;schema&quot;: &quot;rulebook/v1-draft&quot;,
+    &quot;exported_at&quot;: &quot;2026-11-12T10:00:00.000Z&quot;,
+    &quot;rulebook&quot;: {
+      &quot;id&quot;: &quot;my-rulebook&quot;,
+      &quot;name&quot;: &quot;My rulebook&quot;,
+      &quot;description&quot;: &quot;What it does.&quot;,
+      &quot;meters&quot;: [
+        {
+          &quot;id&quot;: &quot;trust&quot;,
+          &quot;type&quot;: &quot;bar&quot;,
+          &quot;label&quot;: &quot;Trust&quot;,
+          &quot;icon&quot;: &quot;shield&quot;,
+          &quot;color&quot;: &quot;blue&quot;,
+          &quot;tracks&quot;: &quot;chat&quot;,
+          &quot;visible&quot;: true,
+          &quot;min&quot;: 0,
+          &quot;max&quot;: 100,
+          &quot;def&quot;: 20,
+          &quot;keywords&quot;: [{ &quot;words&quot;: [&quot;promise&quot;, &quot;swear&quot;], &quot;delta&quot;: 5 }],
+          &quot;bands&quot;: [
+            { &quot;label&quot;: &quot;Guarded&quot;, &quot;to&quot;: 49, &quot;instr&quot;: &quot;{{char}} keeps their guard up.&quot; },
+            { &quot;label&quot;: &quot;Open&quot;, &quot;to&quot;: 100, &quot;instr&quot;: &quot;{{char}} speaks freely to {{user}}.&quot; }
+          ]
+        }
+      ]
+    }
+  }
+  </code></pre>
+  <p>Meters, rules, and triggers all have their own fields. You rarely need to write them by hand: the <a href="#woven-fate-editor">Editor</a> builds and checks them. If you use the Rulebook Creator skill to have an AI draft one, open the result in the Editor to verify it. Ids must start with a letter and use only lowercase letters, digits, <code>-</code> and <code>_</code>.</p>
+  <hr />
+  <h2 id="lorebook-format">Lorebook format</h2>
+  <p>The format the game, the Editor, and the Testbench read:</p>
+  <pre><code class="language-json">{
+    &quot;name&quot;: &quot;Atheron&quot;,
+    &quot;description&quot;: &quot;A land of magic, adventure and intrigue.&quot;,
+    &quot;character_budget&quot;: 8000,
+    &quot;entries&quot;: [
+      {
+        &quot;name&quot;: &quot;Atheron Magical Academy&quot;,
+        &quot;keys&quot;: [&quot;academy&quot;, &quot;atheron academy&quot;, &quot;magic school&quot;],
+        &quot;content&quot;: &quot;A centuries-old school of magic perched above the harbour town...&quot;,
+        &quot;priority&quot;: 2
+      }
+    ]
+  }
+  </code></pre>
+  <table>
+  <thead>
+  <tr>
+  <th>Field</th>
+  <th>Notes</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td><code>name</code>, <code>description</code></td>
+  <td>Labels only</td>
+  </tr>
+  <tr>
+  <td><code>character_budget</code></td>
+  <td>Maximum characters of entry content added per turn. Falls back to 8,000 if missing.</td>
+  </tr>
+  <tr>
+  <td><code>entries[].name</code></td>
+  <td>Shown as the <code>[Name]</code> label in context</td>
+  </tr>
+  <tr>
+  <td><code>entries[].keys</code></td>
+  <td>Words or phrases that trigger the entry. At least one is required. <code>*</code> is a wildcard (at most two per key).</td>
+  </tr>
+  <tr>
+  <td><code>entries[].content</code></td>
+  <td>The lore text the narrator sees</td>
+  </tr>
+  <tr>
+  <td><code>entries[].priority</code></td>
+  <td>1 to 10, where <strong>1 is highest</strong> and is added first when space is tight. Defaults to 5.</td>
+  </tr>
+  </tbody>
+  </table>
+  <p>Entries without keys or content are dropped on load.</p>
+  <hr />
+  <h2 id="woven-fate-editor">Woven Fate Editor</h2>
+  <p><em>(<code>Woven Fate Editor.html</code>)</em></p>
+  <p>A form-based editor for <strong>lorebooks and rulebooks</strong>. It is a separate app on purpose: it never edits a game in progress, so a half-finished rulebook can't break a running story. You build the file here, save it, and load it in the game.</p>
+  <p>Switch between the <strong>Lorebook</strong> and <strong>Rulebook</strong> tabs at the top. Each keeps its own document, so you can work on both at once.</p>
+  <h3 id="top-bar-and-file-handling">Top bar and file handling</h3>
+  <ul>
+  <li><strong>New</strong> starts a fresh document. <strong>Open…</strong> loads a <code>.json</code> file, and the editor detects whether it is a lorebook or a rulebook.</li>
+  <li><strong>Download</strong> saves the file. Rulebooks are saved as <code>&lt;rulebook id&gt;.json</code> and lorebooks under the lorebook's name. If there are errors you are asked before saving.</li>
+  <li><strong>JSON</strong> shows the raw file. You can edit it and apply it, which is the way to repair a rulebook that the forms refuse to open.</li>
+  <li><strong>Light / Dark</strong> toggles the theme.</li>
+  <li>The status bar shows the number of <strong>errors</strong> and <strong>warnings</strong>. Click it to see the list, and click an item to jump to the place it refers to.</li>
+  <li>Your work is kept as a <strong>draft</strong> in the browser while you edit, and the editor offers to restore it next time. Save a file before closing the tab, and the editor warns about unsaved changes.</li>
+  </ul>
+  <p><strong>Exports match the game's own format exactly.</strong> Opening a file and saving it without changes gives the same file byte for byte (apart from the <code>exported_at</code> timestamp, which is refreshed). New fields are placed in the order the rulebook creator uses, and existing ones stay where they were. Only a rulebook that passes the schema check opens in the forms.</p>
+  <h3 id="lorebook-tab">Lorebook tab</h3>
+  <ul>
+  <li>A list of entries with <strong>search</strong> (by name or key) and a <strong>priority filter</strong>, and buttons to add entries or <strong>sort by priority</strong>.</li>
+  <li>Per entry: name, priority, keys (one per line), and content, with a character count. Move, copy, or remove entries.</li>
+  <li><strong>Lorebook settings</strong>: name, description, and character budget.</li>
+  <li>Warnings that mirror what the game does: entries without keys or content (dropped), unusable keys, over-long content or names, bad priorities, and duplicate names.</li>
+  <li><strong>Try it:</strong> paste some story text to see which entries would trigger, in what priority order, and how much of the budget they use. Entries that don't fit are marked as skipped. (For many scenes and statistics, use the <a href="#lorebook-testbench">Testbench</a>.)</li>
+  </ul>
+  <h3 id="rulebook-tab">Rulebook tab</h3>
+  <p>The left side lists the sections; the right side is the form.</p>
+  <ul>
+  <li><strong>Details:</strong> name, file id, and description, with counters for meters, HUD-strip meters, and combined rules.</li>
+  <li><strong>Meters:</strong> add (with a chooser that describes each type), reorder, copy, or remove. Each meter shows an error or warning badge when something is wrong.</li>
+  <li>Common settings: name, id, type, what the AI watches, visibility and HUD placement, icon picker, colour swatches, <em>Player can edit this</em>, <em>Tell the narrator the exact value</em>, and what raises or lowers it.</li>
+  <li><strong>Changing the id</strong> updates every rule that refers to it, and so does changing an item's id. A new meter's id follows its name until you set it yourself.</li>
+  <li><strong>Changing the type</strong> keeps the shared settings and asks before removing settings that only belong to the old type.</li>
+  <li>Type-specific forms: levels (name, limit, instruction, caption, shown, override), keyword rules, AI checks (questions, limits, extract mode, optional "only when" conditions), triggers, clock settings (mode, start, step, skips, level sets), dice and their roll conditions, and the item and rule lists for Select, Collection, and Journal.</li>
+  <li>A <strong>condition builder</strong> whose choices follow the meter type, and a <strong>change</strong> editor (adds, sets, multiplies, divides, random amount, keep between) with an optional "× another meter's value".</li>
+  <li><strong>Combined rules:</strong> conditions plus an instruction and caption.</li>
+  <li><strong>Preview &amp; test:</strong> set every meter to any value (sliders, dates and times, dice results, items, events) and see the cards as the player sees them and the exact text the narrator would receive. This uses the game's own code, so it matches play. It never changes your rulebook.</li>
+  </ul>
+  <p>Some checks go beyond the schema, for example: a trigger can't watch the meter it changes (so triggers need a second meter), there can be only one story clock, and references to meters or items that don't exist are errors.</p>
+  <hr />
   <h2 id="lorebook-converter">Lorebook Converter</h2>
+  <p><em>(<code>Lorebook Converter.html</code>)</em></p>
   <p>Converts lorebooks exported from other tools into the Woven format. Per its interface, it targets SillyTavern, NovelAI, JanitorAI, Agnai, SpicyChat, and similar JSON exports.</p>
   <p><strong>Usage:</strong> drop a <code>.json</code> lorebook onto the window (or click to browse), check the preview, and press <strong>Download Converted JSON</strong>. The output is saved as <code>&lt;original name&gt;.woven.json</code>.</p>
   <p>What it does:</p>
   <ul>
-    <li>Detects the shape of the input (object-keyed entries as in SillyTavern, or array-based entries)</li>
-    <li>Merges primary and secondary keys into one de-duplicated key list</li>
-    <li>Skips entries that are disabled</li>
-    <li>Maps the source's priority or insertion order onto the game's <strong>1&ndash;10</strong> scale (1 is highest priority). Values already between 1 and 10 pass through unchanged. Larger order-style values (higher means stronger) are rescaled smoothly on a log scale: 100 becomes 5, 200 becomes 3, and anything from about 630 up becomes 1. Entries with no usable priority get <strong>5</strong> in every source format.</li>
-    <li>Carries over the name, description, and budget (defaults to <strong>8,000</strong> characters if the source has none)</li>
+  <li>Detects the shape of the input (object-keyed entries as in SillyTavern, or array-based entries)</li>
+  <li>Merges primary and secondary keys into one de-duplicated key list</li>
+  <li>Skips entries that are disabled</li>
+  <li>Maps the source's priority or insertion order onto the game's <strong>1–10</strong> scale (1 is highest priority). Values already between 1 and 10 pass through unchanged. Larger order-style values (higher means stronger) are rescaled smoothly on a log scale: 100 becomes 5, 200 becomes 3, and anything from about 630 up becomes 1. Entries with no usable priority get <strong>5</strong> in every source format.</li>
+  <li>Carries over the name, description, and budget (defaults to <strong>8,000</strong> characters if the source has none)</li>
   </ul>
   <p>Things to check after converting:</p>
   <ul>
-    <li><strong>Review the result.</strong> Formats vary a lot between tools, and the converter only reads common field names.</li>
-    <li><strong>Entries need at least one key.</strong> The game discards entries with no keys, so &ldquo;always-on&rdquo; or &ldquo;constant&rdquo; entries from other tools won't carry over as always-on. Give them keys, or fold them into the story setup.</li>
-    <li><strong>Budget.</strong> A budget found in the source file is carried over as-is (a source <code>token_budget</code> is copied as a character count, not converted). Otherwise the converter writes 8,000, matching the game's own default. You can change it in the game's lorebook dialog, and the Testbench can help you pick a value.</li>
-    <li><strong>Priorities from other tools.</strong> Rescaled order-style values are approximate, so skim the results and adjust any entries that matter. A source value of exactly 10 or less is assumed to already be a 1-10 priority, so it is not rescaled.</li>
-    <li>Conversion runs locally. Your file is not uploaded anywhere.</li>
+  <li><strong>Review the result.</strong> Formats vary a lot between tools, and the converter only reads common field names. The Editor is a good place to tidy it up.</li>
+  <li><strong>Entries need at least one key.</strong> The game discards entries with no keys, so "always-on" or "constant" entries from other tools won't carry over as always-on. Give them keys, or fold them into the story setup.</li>
+  <li><strong>Budget.</strong> A budget found in the source file is carried over as-is (a source <code>token_budget</code> is copied as a character count, not converted). Otherwise the converter writes 8,000, matching the game's own default. You can change it in the game's lorebook dialog or the Editor, and the Testbench can help you pick a value.</li>
+  <li><strong>Priorities from other tools.</strong> Rescaled order-style values are approximate, so skim the results and adjust any entries that matter. A source value of exactly 10 or less is assumed to already be a 1-10 priority, so it is not rescaled.</li>
+  <li>Conversion runs locally. Your file is not uploaded anywhere.</li>
   </ul>
-
-  <h2 id="lorebook-testbench">Lorebook Testbench</h2>
-  <p>A deterministic simulator for answering &ldquo;will my lorebook actually do what I expect?&rdquo; without spending any API calls. It reproduces the game's keyword matching and budget selection, then shows how entries compete for space.</p>
-  <p>It opens with a small embedded sample (the <em>Atheron</em> lorebook and one test scene). Use <strong>Reset to embedded data</strong> to return to it.</p>
-
-  <h3>Loading your own data</h3>
-  <ul>
-    <li><strong>Load lorebook (.json):</strong> the Woven format</li>
-    <li><strong>Load test scenes (.md / .json):</strong> pieces of sample text to scan. You can write these by hand or use the <a href="#lorebook-test-editor">Test Editor</a>.</li>
-  </ul>
-  <p>Scene files in Markdown look like this:</p>
-  <pre><code>## scene1: First-years gather in the great hall
-*Setting:* Atheron Magical Academy, start of term
-*Tests:* Whether academy entries outrank minor lore
-*Cast:* Mira, Headmaster Voss
-*Length:* 1200
-&gt; The scene text goes here, as a blockquote.
-&gt; Continue the quote on every line.</code></pre>
-  <p>Each scene starts with a <code>## sceneN:</code> heading, optional <code>*Setting:*</code>, <code>*Tests:*</code>, <code>*Cast:*</code>, and <code>*Length:*</code> lines, and the text as <code>&gt;</code> blockquote lines. A JSON array of <code>{id, title, setting, tests, cast, text}</code> objects also works.</p>
-
-  <h3>Controls</h3>
-  <ul>
-    <li><strong>Budget:</strong> characters available for lore, with a live <strong>estimated token range</strong> next to it</li>
-    <li><strong>Simulated turns:</strong> 50, 200, 500, or 1,000 random runs per scene. <strong>Re-run simulation</strong> repeats with the same settings.</li>
-    <li><strong>Theme toggle</strong> (dark and light)</li>
-  </ul>
-
-  <h3>Tabs</h3>
-  <ul>
-    <li><strong>Overview:</strong> one row per scene showing how many matched entries made it in, how much of the budget was used, whether everything fit, and counts of <em>contested</em> and <em>never in</em> entries</li>
-    <li><strong>Scenes:</strong> the scene text with matched keys highlighted, a list of matched entries with their hit keys and inclusion probability, and the assembled context from one simulated turn</li>
-    <li><strong>Lorebook:</strong> every entry with its priority, size, and statistics, sortable and filterable, with a note of which scenes use it</li>
-  </ul>
-
-  <h3>How selection is modelled</h3>
-  <p>This mirrors the game:</p>
-  <ul>
-    <li>Keys match as <strong>whole words or phrases</strong>, case-insensitively, with curly quotes normalised. <code>*</code> matches any word characters (at most two per key).</li>
-    <li>Matched entries are tried in <strong>priority order, 1 first and 10 last</strong>, in random order within a priority level. An entry that doesn't fit the remaining budget is skipped, and the rest are still tried.</li>
-    <li>The budget counts <strong>entry content only</strong>. The <code>[Name]</code> labels are free.</li>
-    <li>An entry is <strong>contested</strong> if it makes the cut in some simulated turns but not others, and <strong>never in</strong> if it matched but practically never fits.</li>
-  </ul>
-
-  <h3>Limitations</h3>
-  <ul>
-    <li>Each scene is scanned on its own, as if it were a first turn. In the real game the last 4 messages of history are scanned too.</li>
-    <li>Token figures are estimates (roughly 3&ndash;4.5 characters per token for Latin text, with a separate range for Chinese, Japanese, and Korean). They are not a tokenizer count.</li>
-    <li>It tests matching and budgeting only. It does not call any AI, so it cannot tell you how the narrator will <em>use</em> the lore.</li>
-  </ul>
-
+  <hr />
   <h2 id="lorebook-test-editor">Lorebook Test Editor</h2>
+  <p><em>(<code>Lorebook Test Editor.html</code>)</em></p>
   <p>A simple editor for building the scene files that the Testbench loads, so you don't have to hand-write the Markdown format. Its limits mirror the Testbench's, so a file that passes here should also load there. Like the other tools, it runs entirely offline in your browser.</p>
-
-  <h3>Using it</h3>
+  <h3 id="using-it">Using it</h3>
   <ul>
-    <li><strong>New</strong> starts an empty file, <strong>Load&hellip;</strong> opens an existing <code>.md</code> or <code>.json</code> scenes file, and <strong>+ Add scene</strong> inserts a scene after the one you have selected.</li>
-    <li>The left-hand list shows each scene's id, title, and &ldquo;tests&rdquo; note, with a search box to filter by id, title, setting, cast, or tests. A marker flags scenes with errors or warnings.</li>
-    <li>Select a scene to edit its <strong>Id</strong>, <strong>Title</strong>, <strong>Setting</strong>, <strong>Tests</strong> (which entries or behaviours this scene should exercise), <strong>Cast</strong>, and the <strong>scene text</strong> itself. A live character and word count sits above the text.</li>
-    <li>Per scene you can <strong>Move up</strong>, <strong>Move down</strong>, <strong>Duplicate</strong>, or <strong>Delete</strong>.</li>
-    <li><strong>Declared length</strong> is optional metadata. <strong>Match text</strong> sets it to the actual text length, and if you leave it at 0 it is filled in when you save.</li>
-    <li><strong>Save .json</strong> and <strong>Save .md</strong> download the file, and Ctrl/Cmd+S saves JSON. <strong>Theme</strong> toggles light and dark, sharing its setting with the Testbench.</li>
+  <li><strong>New</strong> starts an empty file, <strong>Load…</strong> opens an existing <code>.md</code> or <code>.json</code> scenes file, and <strong>+ Add scene</strong> inserts a scene after the one you have selected.</li>
+  <li>The left-hand list shows each scene's id, title, and "tests" note, with a search box to filter by id, title, setting, cast, or tests. A marker flags scenes with errors or warnings.</li>
+  <li>Select a scene to edit its <strong>Id</strong>, <strong>Title</strong>, <strong>Setting</strong>, <strong>Tests</strong> (which entries or behaviours the scene should exercise), <strong>Cast</strong>, and the <strong>scene text</strong> itself. A live character and word count sits above the text.</li>
+  <li>Per scene you can <strong>Move up</strong>, <strong>Move down</strong>, <strong>Duplicate</strong>, or <strong>Delete</strong>.</li>
+  <li><strong>Declared length</strong> is optional metadata. <strong>Match text</strong> sets it to the actual text length, and if you leave it at 0 it is filled in when you save.</li>
+  <li><strong>Save .json</strong> and <strong>Save .md</strong> download the file, and Ctrl/Cmd+S saves JSON. <strong>Theme</strong> toggles light and dark, sharing its setting with the other tools.</li>
   </ul>
-
-  <h3>Built-in checks</h3>
+  <h3 id="built-in-checks">Built-in checks</h3>
   <p>Each scene is validated as you type, and the status bar shows the scene count and total characters against the Testbench's limits (100 scenes, 400,000 characters in total).</p>
   <table>
-    <tr><th>Level</th><th>Examples</th></tr>
-    <tr><td><strong>Error</strong></td><td>Missing or duplicate id, empty scene text, text over 20,000 characters, a single word longer than 100 characters</td></tr>
-    <tr><td><strong>Warning</strong></td><td>A title, setting, tests, or cast field over 2,000 characters (it would be truncated), an id over 100 characters</td></tr>
-    <tr><td><strong>Info</strong></td><td>An id that isn't of the form <code>sceneN</code>, a declared length that doesn't match the text, a missing &ldquo;tests&rdquo; note</td></tr>
+  <thead>
+  <tr>
+  <th>Level</th>
+  <th>Examples</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr>
+  <td><strong>Error</strong></td>
+  <td>Missing or duplicate id, empty scene text, text over 20,000 characters, a single word longer than 100 characters</td>
+  </tr>
+  <tr>
+  <td><strong>Warning</strong></td>
+  <td>A title, setting, tests, or cast field over 2,000 characters (it would be truncated), an id over 100 characters</td>
+  </tr>
+  <tr>
+  <td><strong>Info</strong></td>
+  <td>An id that isn't of the form <code>sceneN</code>, a declared length that doesn't match the text, a missing "tests" note</td>
+  </tr>
+  </tbody>
   </table>
   <p>Saving with errors, or with more than 100 scenes, asks for confirmation first, since the Testbench would reject or skip those scenes.</p>
-
-  <h3>Things to know</h3>
+  <h3 id="things-to-know">Things to know</h3>
   <ul>
-    <li><strong>Scene ids and Markdown:</strong> the Testbench's Markdown reader only recognises ids shaped like <code>scene1</code>, <code>scene2</code>, and so on. Other ids are fine in <code>.json</code> but are skipped from a <code>.md</code> save, and you are warned before saving.</li>
-    <li><strong>No autosave:</strong> nothing is stored between sessions apart from the theme. Save your file before closing the tab. The editor warns you about unsaved changes when you load a file, start a new one, or leave the page.</li>
-    <li><strong>Loading:</strong> files over 2 MB are refused, matching the Testbench. JSON files must be an array of scene objects.</li>
+  <li><strong>Scene ids and Markdown:</strong> the Testbench's Markdown reader only recognises ids shaped like <code>scene1</code>, <code>scene2</code>, and so on. Other ids are fine in <code>.json</code> but are skipped from a <code>.md</code> save, and you are warned before saving.</li>
+  <li><strong>No autosave:</strong> nothing is stored between sessions apart from the theme. Save your file before closing the tab. The editor warns you about unsaved changes when you load a file, start a new one, or leave the page.</li>
+  <li><strong>Loading:</strong> files over 2 MB are refused, matching the Testbench. JSON files must be an array of scene objects.</li>
   </ul>
-
-  <h2 id="lorebook-format">Lorebook format</h2>
-  <p>The format both the game and the Testbench read:</p>
-  <pre><code>{
-  "name": "Atheron",
-  "description": "A land of magic, adventure and intrigue.",
-  "character_budget": 8000,
-  "entries": [
-    {
-      "name": "Atheron Magical Academy",
-      "keys": ["academy", "atheron academy", "magic school"],
-      "content": "A centuries-old school of magic perched above the harbour town...",
-      "priority": 2
-    }
-  ]
-}</code></pre>
-  <table>
-    <tr><th>Field</th><th>Notes</th></tr>
-    <tr><td><code>name</code>, <code>description</code></td><td>Labels only</td></tr>
-    <tr><td><code>character_budget</code></td><td>Maximum characters of entry content added per turn. Falls back to 8,000 if missing.</td></tr>
-    <tr><td><code>entries[].name</code></td><td>Shown as the <code>[Name]</code> label in context</td></tr>
-    <tr><td><code>entries[].keys</code></td><td>Words or phrases that trigger the entry. At least one is required. <code>*</code> is a wildcard.</td></tr>
-    <tr><td><code>entries[].content</code></td><td>The lore text the narrator sees</td></tr>
-    <tr><td><code>entries[].priority</code></td><td>1 to 10, where <strong>1 is highest</strong> and is added first when space is tight. Defaults to 5.</td></tr>
-  </table>
-  <p>Entries without keys or content are dropped on load.</p>
-
-  <h2>Privacy and storage</h2>
+  <hr />
+  <h2 id="lorebook-testbench">Lorebook Testbench</h2>
+  <p><em>(<code>Lorebook Testbench.html</code>)</em></p>
+  <p>A deterministic simulator for answering "will my lorebook actually do what I expect?" without spending any API calls. It reproduces the game's keyword matching and budget selection, then shows how entries compete for space. It tests <strong>lorebooks only</strong>; for rulebooks use the Editor's Preview &amp; test page.</p>
+  <p>It opens with a small embedded sample (the <em>Atheron</em> lorebook and one test scene). Use <strong>Reset to embedded data</strong> to return to it.</p>
+  <h3 id="loading-your-own-data">Loading your own data</h3>
   <ul>
-    <li>API targets (including <strong>API keys</strong>), saves, session state, and theme preferences are stored in your browser's <code>localStorage</code>. They never leave your machine except in requests to the API service you configured.</li>
-    <li>Your lorebooks and story text <em>are</em> sent to that service as part of prompts.</li>
-    <li>Clearing site data for the page removes your keys and saves. Use <strong>Export</strong> on a save to keep a backup.</li>
-    <li>Individual saves are limited to roughly 4.8 MB.</li>
-    <li>Both game files use the same storage namespace (<code>woven_fate::</code>), so when they are served from the same browser origin they can see each other's saves and API targets. Browsers treat <code>file://</code> pages differently, so if saves don't appear in the other version, use <strong>Export</strong> and <strong>Import</strong>.</li>
+  <li><strong>Load lorebook (.json):</strong> the Woven format</li>
+  <li><strong>Load test scenes (.md / .json):</strong> pieces of sample text to scan. You can write these by hand or use the <a href="#lorebook-test-editor">Test Editor</a>.</li>
   </ul>
-
-  <h2>Requirements</h2>
-  <p>A current desktop or mobile browser (Chrome, Edge, Firefox, Safari) and, for the game, an API key or a reachable local model endpoint. The Converter, Test Editor, and Testbench need no API access and work offline.</p>
+  <p>Scene files in Markdown look like this:</p>
+  <pre><code class="language-markdown">## scene1: First-years gather in the great hall
+  *Setting:* Atheron Magical Academy, start of term
+  *Tests:* Whether academy entries outrank minor lore
+  *Cast:* Mira, Headmaster Voss
+  *Length:* 1200
+  &gt; The scene text goes here, as a blockquote.
+  &gt; Continue the quote on every line.
+  </code></pre>
+  <p>Each scene starts with a <code>## sceneN:</code> heading, optional <code>*Setting:*</code>, <code>*Tests:*</code>, <code>*Cast:*</code>, and <code>*Length:*</code> lines, and the text as <code>&gt;</code> blockquote lines. A JSON array of <code>{id, title, setting, tests, cast, text}</code> objects also works.</p>
+  <h3 id="controls">Controls</h3>
+  <ul>
+  <li><strong>Budget:</strong> characters available for lore, with a live <strong>estimated token range</strong> next to it</li>
+  <li><strong>Simulated turns:</strong> 50, 200, 500, or 1,000 random runs per scene. <strong>Re-run simulation</strong> repeats with the same settings.</li>
+  <li><strong>Theme toggle</strong> (dark and light)</li>
+  </ul>
+  <h3 id="tabs">Tabs</h3>
+  <ul>
+  <li><strong>Overview:</strong> one row per scene showing how many matched entries made it in, how much of the budget was used, whether everything fit, and counts of <em>contested</em> and <em>never in</em> entries</li>
+  <li><strong>Scenes:</strong> the scene text with matched keys highlighted, a list of matched entries with their hit keys and inclusion probability, and the assembled context from one simulated turn</li>
+  <li><strong>Lorebook:</strong> every entry with its priority, size, and statistics, sortable and filterable, with a note of which scenes use it</li>
+  </ul>
+  <h3 id="how-selection-is-modelled">How selection is modelled</h3>
+  <p>This mirrors the game:</p>
+  <ul>
+  <li>Keys match as <strong>whole words or phrases</strong>, case-insensitively, with curly quotes normalised. <code>*</code> matches any word characters (at most two per key).</li>
+  <li>Matched entries are tried in <strong>priority order, 1 first and 10 last</strong>, in random order within a priority level. An entry that doesn't fit the remaining budget is skipped, and the rest are still tried.</li>
+  <li>The budget counts <strong>entry content only</strong>. The <code>[Name]</code> labels are free.</li>
+  <li>An entry is <strong>contested</strong> if it makes the cut in some simulated turns but not others, and <strong>never in</strong> if it matched but practically never fits.</li>
+  </ul>
+  <h3 id="limitations">Limitations</h3>
+  <ul>
+  <li>Each scene is scanned on its own, as if it were a first turn. In the real game the last 4 messages of history are scanned too.</li>
+  <li>Token figures are estimates (roughly 3–4.5 characters per token for Latin text, with a separate range for Chinese, Japanese, and Korean). They are not a tokenizer count.</li>
+  <li>It tests matching and budgeting only. It does not call any AI, so it cannot tell you how the narrator will <em>use</em> the lore.</li>
+  </ul>
+  <hr />
+  <h2 id="privacy-and-storage">Privacy and storage</h2>
+  <ul>
+  <li>API targets (including <strong>API keys</strong>), saves, session state, and theme preferences are stored in your browser's <code>localStorage</code>. They never leave your machine except in requests to the API service you configured.</li>
+  <li>Your lorebooks, rulebooks, and story text <em>are</em> sent to that service as part of prompts. Rulebooks with AI checks send a short extra request after each message.</li>
+  <li>Clearing site data for the page removes your keys and saves. Use <strong>Export</strong> on a save to keep a backup.</li>
+  <li>Individual saves are limited to roughly 4.8 MB.</li>
+  <li>Both game files use the same storage namespace (<code>woven_fate::</code>), so when they are served from the same browser origin they can see each other's saves and API targets. Browsers treat <code>file://</code> pages differently, so if saves don't appear in the other version, use <strong>Export</strong> and <strong>Import</strong>.</li>
+  <li>The Editor stores only unsaved drafts and the theme in your browser; nothing is sent anywhere.</li>
+  </ul>
+  <h2 id="requirements">Requirements</h2>
+  <p>A current desktop or mobile browser (Chrome, Edge, Firefox, Safari) and, for the game, an API key or a reachable local model endpoint. The Editor, Converter, Test Editor, and Testbench need no API access and work offline.</p>
 
   <hr>
   <footer>

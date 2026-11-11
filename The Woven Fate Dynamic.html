@@ -41,6 +41,60 @@
   .fade-btn { border-radius:4px; cursor:pointer; transition:all .2s; outline:none; }
 
   ::placeholder { color: var(--textD); opacity:0.8; }
+
+/* Rulebook meters */
+#rbHud{display:flex;gap:8px;flex-wrap:wrap;padding:8px 16px 0;flex-shrink:0}
+#rbHud:empty{display:none}
+.rb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:6px}
+.rb-card{flex:1 1 150px;min-width:130px;max-width:260px;background:var(--bgCard);border:1px solid var(--cardBdr);border-radius:6px;padding:7px 10px;display:flex;flex-direction:column;gap:5px}
+.rb-card.full{max-width:none;min-width:0}
+.rb-head{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--textM)}
+.rb-head svg{color:var(--rb);flex:none}
+.rb-val{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text);letter-spacing:0;text-transform:none}
+.rb-delta{font-size:11px;font-weight:700;letter-spacing:0}
+.rb-bar{position:relative;height:9px;border-radius:5px;background:var(--iBg);border:1px solid var(--bdrM);overflow:hidden}
+.rb-fill{position:absolute;left:0;top:0;bottom:0;background:var(--rb);border-radius:4px;transition:width .6s ease}
+.rb-tick{position:absolute;top:0;bottom:0;width:1px;background:var(--bdrM);opacity:.9}
+.rb-pips{display:flex;gap:3px;flex-wrap:wrap}
+.rb-pip{color:var(--textD);opacity:.55;display:inline-flex}
+.rb-pip.on{color:var(--rb);opacity:1}
+.rb-num{font-size:20px;font-variant-numeric:tabular-nums;color:var(--rb);line-height:1.2}
+.rb-level{font-size:12px;color:var(--text)}
+.rb-cap{font-size:11px;color:var(--textD);font-style:italic}
+.rb-bands{display:flex;gap:4px;flex-wrap:wrap}
+.rb-band{font-size:10px;padding:1px 7px;border:1px solid var(--bdrM);border-radius:9px;color:var(--textD)}
+.rb-band.cur{border-color:var(--rb);color:var(--text)}
+.rb-rl{font-size:11px;color:var(--textM)}
+@media (prefers-reduced-motion:reduce){.rb-fill{transition:none}}
+
+/* Rulebook HUD: minimal chips with a hover card */
+#rbHud.min{gap:6px}
+.rb-card[data-act]{cursor:pointer}
+.rb-chip{position:relative;font:inherit;font-size:12px;font-variant-numeric:tabular-nums;color:var(--text);background:var(--bgCard);border:1px solid var(--cardBdr);border-left:3px solid var(--rb);border-radius:12px;padding:3px 10px;cursor:pointer;line-height:1.4}
+.rb-chip:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.rb-chip .rb-pop{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:30;width:max-content;min-width:200px;max-width:min(270px,88vw);text-align:left;cursor:pointer}
+.rb-chip.rb-right .rb-pop{left:auto;right:0}
+.rb-chip:hover .rb-pop,.rb-chip:focus-visible .rb-pop{display:block}
+.rb-chip .rb-pop .rb-card{max-width:none;box-shadow:0 6px 18px rgba(0,0,0,.45);background:linear-gradient(var(--bgCard),var(--bgCard)),var(--bg)} /* solid, so the story text doesn't show through */
+
+.rb-of{font-size:11px;color:var(--textD)}
+.rb-tags{display:flex;gap:4px;flex-wrap:wrap}
+.rb-tag{font-size:11px;padding:1px 8px;border:1px solid var(--rb);border-radius:9px;color:var(--text)}
+.rb-tags.dim .rb-tag{border-color:var(--bdrM);color:var(--textD);opacity:.7}
+.rb-jl{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--text)}
+.rb-jl small{color:var(--textD);margin-left:6px}
+.rb-sit{flex:1 1 100%;display:flex;gap:6px 14px;flex-wrap:wrap;margin-top:2px}
+.rb-grid+.rb-sit{margin-top:10px}
+.rb-sit-i{font-size:11px;font-style:italic;color:var(--textM);border-left:2px solid var(--acc);padding-left:7px}
+
+span.rb-edit{cursor:pointer;border-bottom:1px dotted var(--textD)}
+span.rb-edit:hover,span.rb-edit:focus-visible{border-bottom-color:var(--rb);outline:none}
+button.rb-band,button.rb-tag{background:transparent;font-family:inherit;cursor:pointer}
+button.rb-tag{font-size:11px}
+.rb-tag.off{border-color:var(--bdrM);color:var(--textD);opacity:.7}
+.rb-in{width:84px;font-size:12px;padding:2px 4px;background:var(--iBg);border:1px solid var(--bdrM);border-radius:4px;color:var(--text);font-family:inherit}
+.rb-in.rb-hm{width:48px}
+.rb-ii{display:inline-flex;vertical-align:-2px;margin-right:4px}
 </style>
 </head>
 <body>
@@ -140,13 +194,13 @@ const ENGINE_SYSTEM = {
   political:    "courts, factions, and alliances: danger through words, leverage, and shifting power dynamics, including the consequences of war and rebellion",
 };
 
-const MAX_KEY=3, MAX_ITEMS=5, MAX_CHARS=12, MAX_COND=3;
+const MAX_KEY=3, MAX_ITEMS=5, MAX_CHARS=12;
 const HISTORY_LIMIT=15, HISTORY_KEEP=6, EVENTS_LIMIT=20, EVENTS_COLLAPSE=10;
 const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v4.8.9-json-sanitize";
+const APP_VERSION="v5.2-dynamic";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -232,18 +286,11 @@ function openAiCompatibleParseText(data){
   return typeof content==="string" ? content : null;
 }
 function openAiCompatibleParseError(data){
-  if(!data || typeof data!=="object") return null;
-  if(data.error){ // OpenAI-style nested error: {error:{message,type,code}}
-    const err = data.error;
-    const message = typeof err==="string" ? err : (err.message||JSON.stringify(err));
-    const type = (typeof err==="object" && (err.type||err.code)) || "unknown";
-    return {type:String(type), message};
-  }
-  // Mistral-style flat error body: {object:"error", message, type, code, param}
-  if((data.object==="error" || data.code) && data.message){
-    return {type:String(data.type||data.code||"unknown"), message:String(data.message), raw:data};
-  }
-  return null;
+  if(!data || !data.error) return null;
+  const err = data.error;
+  const message = typeof err==="string" ? err : (err.message||JSON.stringify(err));
+  const type = (typeof err==="object" && (err.type||err.code)) || "unknown";
+  return {type:String(type), message};
 }
 
 const PROVIDERS = {
@@ -416,8 +463,7 @@ const L = {
   charClr:"#7030b0", evClr:"#5a4830", actClr:"#6e4a08", bookClr:"#0a7a8a",
 };
 
-const DEFAULT_CONDITIONS = {superficial:[],moderate:[],severe:[],positive:[]};
-const DEFAULT_PLAYER = {gender:"undefined",desc:"",quest:null,keyItems:[],items:[],tools:null,characters:[],completedQuests:[],names:[],conditions:DEFAULT_CONDITIONS};
+const DEFAULT_PLAYER = {gender:"undefined",desc:"",quest:null,keyItems:[],items:[],tools:null,characters:[],completedQuests:[],names:[]};
 const DEFAULT_MEMORY = {events:[],acts:[]};
 
 /* ============================== STORAGE SHIM =============================
@@ -479,7 +525,7 @@ function buildSystem(mood,setting,engine,playerInfo,isJudge){
   const memLine = (playerInfo && playerInfo.memoryContext) ? `\n\nStory so far (for continuity \u2014 do not restate verbatim, just stay consistent with it):\n${playerInfo.memoryContext}` : "";
   const itemsLine = (playerInfo && playerInfo.itemsContext) ? `\n\nThe player currently carries:\n${playerInfo.itemsContext}` : "";
   const loreLine = (playerInfo && playerInfo.loreContext) ? `\n\nWorld lore (established canon \u2014 stay consistent with it, use it naturally when relevant, never quote it or mention a lorebook):\n${playerInfo.loreContext}` : "";
-  const condLine = (playerInfo && playerInfo.conditionsContext) ? `\n\n${playerInfo.conditionsContext}` : "";
+  const condLine = (playerInfo && playerInfo.rulebookContext) ? `\n\nRulebook — the current state of the story's tracked meters. Treat each note as binding for how the characters behave right now. A note marked PRIORITY overrides what the player's message asks for in this reply: the character acts as the note says even if the player's action says otherwise. Never mention meters, numbers or levels:\n${playerInfo.rulebookContext}` : "";
   if(isJudge) return `You are a game master running a ${sl} setting with this plot engine: ${ed}. Analyse player actions. Respond ONLY with raw JSON \u2014 no markdown, no explanation.${pLine}${memLine}${itemsLine}${condLine}${loreLine}`;
   return `You are the game master of a ${sl} setting RPG. Plot engine: ${ed}. Tone: ${md}. Write immersive prose in second person ("You\u2026"). No game-mechanics language. Never break the fourth wall.${pLine}${memLine}${itemsLine}${condLine}${loreLine}\n\nCRITICAL RULE: Never write any dialogue, speech, decisions, or actions performed BY the player character. Other characters may speak and act freely, and you may describe things happening TO or AROUND the player, but the player alone decides what they say or do next. Always end your response at a moment that leaves the next action open to the player \u2014 do not narrate or imply what they say, choose, or do.\n\nFormatting:\n- Wrap character/creature names in **double asterisks**\n- Wrap location/place names in *single asterisks*\n- Always use straight double quotes " " for any spoken dialogue, never single quotes\n- Never wrap dialogue in asterisks or combine it with italics \u2014 dialogue should be plain text inside its quotes\n- Do not wrap anything else`;
 }
@@ -507,14 +553,6 @@ function itemsContextString(player){
   return bits.join("\n");
 }
 
-function conditionsContextString(player){
-  const c = player.conditions || {superficial:[],moderate:[],severe:[],positive:[]};
-  const bits=[];
-  const neg=[...c.moderate.map(x=>`${x.label} (moderate)`),...c.severe.map(x=>`${x.label} (severe)`)];
-  if(neg.length) bits.push(`Active negative conditions (may work against the player physically or otherwise \u2014 factor into any challenge modifier): ${neg.join(", ")}`);
-  if(c.positive.length) bits.push(`Active positive conditions (may work in the player's favor \u2014 factor into any challenge modifier): ${c.positive.map(x=>x.label).join(", ")}`);
-  return bits.length ? `The player's active conditions:\n${bits.join("\n")}` : "";
-}
 
 const SAVE_INDEX_KEY="woven_fate_save_index";
 function saveKey(id){ return `woven_fate_save:${id}`; }
@@ -522,51 +560,6 @@ function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Mat
 function newId(){return `${Date.now()}_${Math.random().toString(36).slice(2,8)}`;}
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
 function byteLength(str){ try{ return new Blob([str]).size; }catch(e){ return str.length; } }
-
-/* ---- Rate-limit safety: spacing queue + retry with backoff ----
-   Strict API tiers (e.g. Mistral Free mode at ~1 request/second) reject
-   bursts, and this app fires several API calls per turn (game setup:
-   tools + names + opening scene + state extraction; later turns:
-   narration + extraction). Every call is therefore funneled through a
-   queue that spaces request starts at least API_MIN_INTERVAL_MS apart,
-   and transient 429/5xx responses are retried with exponential backoff
-   (honouring a readable Retry-After header when the browser exposes it). */
-const API_MIN_INTERVAL_MS = 1100;
-const API_MAX_RETRIES = 4;
-const API_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
-let _apiQueueTail = Promise.resolve();
-let _apiLastSentAt = 0;
-function apiSleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
-/* Cross-tab coordination: every tab/window of this app shares the same
-   API key and therefore the same rate limit, so the "last request sent"
-   timestamp is also mirrored in localStorage and the most recent value
-   wins. Stamp it immediately before EVERY send, retries included. */
-const API_LAST_SENT_KEY = "woven_fate_api_last_sent_at";
-function apiReadLastSentAt(){
-  let shared = 0;
-  try{ const v = parseInt(window.localStorage.getItem(API_LAST_SENT_KEY),10); if(isFinite(v) && v>0) shared = v; }catch(e){}
-  return Math.max(_apiLastSentAt, shared);
-}
-function apiMarkSent(){
-  _apiLastSentAt = Date.now();
-  try{ window.localStorage.setItem(API_LAST_SENT_KEY, String(_apiLastSentAt)); }catch(e){}
-}
-function callViaApiQueue(sendFn){
-  const run = async ()=>{
-    const wait = apiReadLastSentAt() + API_MIN_INTERVAL_MS - Date.now();
-    if(wait>0) await apiSleep(wait);
-    return sendFn(apiMarkSent);
-  };
-  const p = _apiQueueTail.then(run, run);
-  _apiQueueTail = p.catch(()=>{});
-  return p;
-}
-function apiRetryDelayMs(res, attempt){
-  let ra = NaN;
-  try{ ra = parseInt(res.headers && res.headers.get("retry-after"), 10); }catch(e){}
-  if(isFinite(ra) && ra>0 && ra<=120) return Math.min(30000, ra*1000 + 300);
-  return Math.min(30000, 1500*Math.pow(2, attempt));
-}
 
 async function callClaude(messages,system,maxTokens){
   const target = activeTarget();
@@ -584,19 +577,7 @@ async function callClaude(messages,system,maxTokens){
   const _t0=Date.now();
   let res;
   try{
-    res = await callViaApiQueue(async (markSent)=>{
-      const reqBody = JSON.stringify(body);
-      for(let attempt=0; ; attempt++){
-        markSent(); // stamp immediately before the request actually leaves
-        const r = await fetch(endpoint, {method:"POST", headers, body:reqBody});
-        if(API_RETRY_STATUSES.has(r.status) && attempt<API_MAX_RETRIES){
-          try{ await r.text(); }catch(e2){} // drain the body before retrying
-          await apiSleep(apiRetryDelayMs(r, attempt));
-          continue;
-        }
-        return r;
-      }
-    });
+    res = await fetch(endpoint, {method:"POST", headers, body:JSON.stringify(body)});
   }catch(networkErr){
     throw new Error(`Network error \u2014 could not reach "${target.name}" (${networkErr.message})`);
   }
@@ -612,7 +593,7 @@ async function callClaude(messages,system,maxTokens){
       const resetStr = resetDate ? formatResetTime(resetDate) : null;
       throw new Error(resetStr ? `Rate limited / overloaded \u2014 limit resets around ${resetStr}` : `Rate limited / overloaded \u2014 try again shortly (${m})`);
     }
-    if(/rate.?limit/i.test(ty) || res.status===429) throw new Error(`Rate limited on "${target.name}" \u2014 ${API_MAX_RETRIES+1} spaced retries didn't get through, so the limit is likely exhausted for this minute (last message: ${m})`);
+    if(/rate.?limit/i.test(ty) || res.status===429) throw new Error(`Rate limited / overloaded on "${target.name}" \u2014 try again shortly (${m})`);
     if(ty==="invalid_request_error") throw new Error(`Invalid request to "${target.name}" (${m})`);
     if(ty==="authentication_error"||ty==="permission_error"||res.status===401||res.status===403){
       openSettingsModal();
@@ -634,126 +615,17 @@ async function callClaude(messages,system,maxTokens){
 function safeHostname(url){
   try{ return new URL(url).hostname; }catch(e){ return ""; }
 }
-function extractFirstJsonObject(s){
-  /* Scans s for the first {...} block that is both balanced (braces inside
-     string values ignored) and parseable, and returns the parsed value.
-     Returns undefined if none is found. */
-  for(let start=s.indexOf("{"); start!==-1; start=s.indexOf("{",start+1)){
-    let depth=0, inStr=false, esc=false;
-    for(let i=start;i<s.length;i++){
-      const ch=s[i];
-      if(esc){ esc=false; continue; }
-      if(inStr){
-        if(ch==="\\") esc=true;
-        else if(ch==='"') inStr=false;
-        continue;
-      }
-      if(ch==='"') inStr=true;
-      else if(ch==="{") depth++;
-      else if(ch==="}"){
-        depth--;
-        if(depth===0){
-          try{ return JSON.parse(s.slice(start,i+1)); }catch(e){ break; }
-        }
-      }
-    }
-  }
-  return undefined;
-}
-function closeOpenJson(prefix){
-  /* Re-scans prefix and returns it with any unterminated string, brackets
-     and braces closed, so a cut-off JSON body can parse. */
-  const stack=[]; let inStr=false, esc=false;
-  for(let i=0;i<prefix.length;i++){
-    const ch=prefix[i];
-    if(esc){ esc=false; continue; }
-    if(inStr){
-      if(ch==="\\") esc=true;
-      else if(ch==='"') inStr=false;
-      continue;
-    }
-    if(ch==='"') inStr=true;
-    else if(ch==="{") stack.push("}");
-    else if(ch==="[") stack.push("]");
-    else if(ch==="}"||ch==="]") stack.pop();
-  }
-  let out=prefix;
-  if(inStr) out+='"';
-  return out+stack.slice().reverse().join("");
-}
-function repairTruncatedJson(s){
-  /* Salvages a JSON object that was cut off mid-transmission (the model's
-     token limit): closes the open structure as-is first, then progressively
-     drops the trailing partial field (cutting at structural commas) until
-     something parses. Returns the parsed object or undefined. */
-  const start=s.indexOf("{");
-  if(start===-1) return undefined;
-  const body=s.slice(start);
-  const tryParse=(t)=>{ try{ return JSON.parse(t); }catch(e){ return undefined; } };
-  let r=tryParse(closeOpenJson(body));
-  if(r!==undefined) return r;
-  for(let cut=body.length-1;cut>=0;cut--){
-    if(body[cut]===","){
-      r=tryParse(closeOpenJson(body.slice(0,cut)));
-      if(r!==undefined) return r;
-    }
-  }
-  return undefined;
-}
-function sanitizeJsonStrings(s){
-  /* Small models sometimes emit raw control characters (a literal newline or
-     tab) inside JSON string values. That is invalid JSON \u2014 and worse, it
-     makes the truncation-repair salvage believe the reply was cut off. This
-     scans with proper string/escape state and escapes control chars inside
-     string values only. No-op on already-valid JSON. */
-  let out="", inStr=false, esc=false;
-  for(let i=0;i<s.length;i++){
-    const ch=s[i], c=s.charCodeAt(i);
-    if(esc){ out+=ch; esc=false; continue; }
-    if(inStr){
-      if(ch==="\\"){ out+=ch; esc=true; continue; }
-      if(ch==="\""){ inStr=false; out+=ch; continue; }
-      if(c<0x20){ out += ch==="\n"?"\\n" : ch==="\t"?"\\t" : ch==="\r"?"\\r" : "\\u"+c.toString(16).padStart(4,"0"); continue; }
-      out+=ch; continue;
-    }
-    if(ch==="\"") inStr=true;
-    out+=ch;
-  }
-  return out;
-}
 function safeParseJSON(input, fallback){
   if(fallback===undefined) fallback=null;
   try{
-    const raw = sanitizeJsonStrings(String(input));
-    /* Attempt 1: drop stray fence markers, parse the whole text. */
-    const stripped = raw.replace(/```json|```/g,"").trim();
-    try{ return JSON.parse(stripped); }catch(e1){}
-    /* Attempt 2: small models sometimes embed a WHOLE fenced code block
-       (raw newlines, unescaped quotes) inside a string value, which is
-       structurally invalid JSON. Removing such blocks entirely leaves a
-       valid object with the damaged value emptied out. Tried before blind
-       brace extraction, so an embedded garbage object is never mistaken
-       for the reply itself. */
-    const deblocked = raw.replace(/```[a-zA-Z]*\n?[\s\S]*?```/g,"").replace(/```[a-zA-Z]*\n?/g,"").trim();
-    try{ return JSON.parse(deblocked); }catch(e2){}
-    /* Attempt 3: extract the first balanced {...} block from either text. */
-    let ex = extractFirstJsonObject(stripped);
-    if(ex!==undefined) return ex;
-    ex = extractFirstJsonObject(deblocked);
-    if(ex!==undefined) return ex;
-    /* Attempt 4: the reply was cut off mid-stream by the model's token
-       limit (in-game JSON wraps whole narrations, so a long scene can
-       exceed max_tokens). Repair the truncation so every complete field
-       survives and only the final partial value is lost. */
-    const repaired = repairTruncatedJson(stripped);
-    if(repaired!==undefined) return repaired;
-    throw new Error("no JSON object found in reply");
+    const cleanInput = String(input).replace(/```json|```/g,"").trim();
+    return JSON.parse(cleanInput);
   }catch(err){
     console.error("safeParseJSON: JSON parsing failed, returning fallback state", err, input);
     return fallback;
   }
 }
-const parseJSON = safeParseJSON; // parses model replies: strips fences, returns fallback on failure
+const parseJSON = safeParseJSON; // kept as an alias so existing call sites are unaffected
 function extractResetTimestamp(errVal){
   let obj=errVal;
   if(typeof obj==="string"){
@@ -881,6 +753,7 @@ const S = {
   lorebook: null,
   lorebookOpen: false,
   lorebookMsg: null,
+  rulebook: null, rbState: null, rbPending: null, rbMsg: null, rulebookOpen: false, lastRbStats: null, rbShown: {},
   dynLore: {story:"",entries:[],budget:4000,turn:0,pending:[]},
   lastDynStats: null,
   debug: (function(){ try{ return window.localStorage.getItem("woven_fate_debug")==="1"; }catch(e){ return false; } })(),
@@ -933,6 +806,7 @@ function applyThemeVars(){
   const t = theme();
   const root = document.documentElement;
   for(const k in t) root.style.setProperty("--"+k, t[k]);
+  rbApplyColorVars();
 }
 
 /* ---- Pure state mutation helper ----
@@ -954,7 +828,7 @@ function persistSession(){
     window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
       dark:S.dark, mood:S.mood, setting:S.setting, engine:S.engine,
       player:S.player, memory:S.memory, books:S.books, msgs:S.msgs,
-      history:S.history, screen:S.screen, autosaveEnabled:S.autosaveEnabled, lorebook:S.lorebook,dynLore:S.dynLore,
+      history:S.history, screen:S.screen, autosaveEnabled:S.autosaveEnabled, lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,dynLore:S.dynLore,
       savedAt:Date.now(),
     }));
   }catch(e){ /* storage full/unavailable \u2014 non-fatal, Tales saves are the durable store */ }
@@ -1062,12 +936,7 @@ function sanitizeDeep(v,depth,c){
   }
   return undefined;
 }
-/* Strict parser for imported files (saves / lorebooks) \u2014 deliberately
-   throws on bad input. Must NOT share a name with the lenient model-reply
-   parser above: duplicate function declarations in the same scope silently
-   shadow each other, which used to route every model reply through this
-   strict path and made all in-game JSON parsing fail. */
-function parseImportJSON(text,maxChars){
+function safeParseFileJSON(text,maxChars){
   if(typeof text!=="string") throw new Error("File is not text.");
   if(text.length>maxChars) throw new Error("File is too large.");
   if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
@@ -1097,7 +966,7 @@ function validateSave(d){
   }
   return d;
 }
-function parseStoredSave(text){ return validateSave(parseImportJSON(text,SAVE_SIZE_LIMIT_BYTES)); }
+function parseStoredSave(text){ return validateSave(safeParseFileJSON(text,SAVE_SIZE_LIMIT_BYTES)); }
 
 /* ============================== LOREBOOK ============================== */
 const LORE_DEFAULT_BUDGET=8000, LORE_SCAN_MESSAGES=4;
@@ -1122,19 +991,6 @@ function normalizeLorebook(d){
 }
 /* Normalise curly quotes, then match a key as a whole word/phrase; "*" matches any word characters. */
 function loreNorm(t){ return String(t).slice(-20000).toLowerCase().replace(/[\u2018\u2019]/g,"'"); }
-/* Strip markdown emphasis/markup from lore text. Lore is injected into prompts
-   as plain text, so ** and friends never render \u2014 they are pure token waste. */
-function stripMarkup(s){
-  return String(s)
-    .replace(/`{1,3}([^`]*)`{1,3}/g,"$1")
-    .replace(/\*\*+(.+?)\*+\*/g,"$1")
-    .replace(/__(.+?)__/g,"$1")
-    .replace(/~~(.+?)~~/g,"$1")
-    .replace(/\*([^*\n]+)\*/g,"$1")
-    .replace(/(^|[^A-Za-z0-9_])_(?!\s)([^_\n]+?)_(?=[^A-Za-z0-9_]|$)/g,"$1$2")
-    .replace(/\s{2,}/g," ")
-    .trim();
-}
 const LORE_RE_CACHE=new Map();
 function loreKeyRegex(key){
   let re=LORE_RE_CACHE.get(key); if(re) return re;
@@ -1155,8 +1011,7 @@ function loreSelect(lb,scan,budget){
   const out=[], added=[]; let remaining=budget;
   for(let pr=1;pr<=10 && remaining>0;pr++){
     for(const e of shuffle(matched.filter(x=>x.priority===pr))){
-      const c=stripMarkup(e.content);
-      if(c.length<=remaining){ out.push(`[${e.name}] ${c}`); added.push(e); remaining-=c.length; }
+      if(e.content.length<=remaining){ out.push(`[${e.name}] ${e.content}`); added.push(e); remaining-=e.content.length; }
     }
   }
   return {ctx:out.join("\n\n"),stats:{has:true,triggered:matched.length,added:added.map(e=>e.name),
@@ -1178,7 +1033,7 @@ function seedDynLoreFromLegacy(d){
 }
 /* The story-so-far entry is always on and is charged to the dynamic budget first; keyed entries fill the rest. */
 function buildDynContext(extraText){
-  const d=S.dynLore, st=stripMarkup(d.story||"");
+  const d=S.dynLore, st=(d.story||"").trim();
   const r=loreSelect(d,loreScanText(extraText),Math.max(0,d.budget-st.length));
   S.lastDynStats={...r.stats,story:st.length,budget:d.budget,used:r.stats.used+st.length};
   return [st?`[Story so far] ${st}`:"",r.ctx].filter(Boolean).join("\n\n");
@@ -1195,11 +1050,11 @@ async function updateDynLore(action,text){
   if(!p || typeof p!=="object") return {created:0,updated:0,failed:true};
   d.pending=[];
   let created=0,updated=0;
-  if(typeof p.story==="string" && p.story.trim()) d.story=stripMarkup(p.story).slice(0,DYN_MAX_STORY);
+  if(typeof p.story==="string" && p.story.trim()) d.story=p.story.trim().slice(0,DYN_MAX_STORY);
   for(const r of (Array.isArray(p.entries)?p.entries:[])){
-    const name=stripMarkup(String((r&&r.name)||"")), content=stripMarkup(String((r&&r.content)||"")).slice(0,DYN_MAX_ENTRY);
+    const name=String((r&&r.name)||"").trim(), content=String((r&&r.content)||"").trim().slice(0,DYN_MAX_ENTRY);
     if(!name||!content) continue;
-    const keys=[...new Set([name,...(Array.isArray(r.keys)?r.keys:[])].map(k=>stripMarkup(String(k))).filter(Boolean))].slice(0,12);
+    const keys=[...new Set([name,...(Array.isArray(r.keys)?r.keys:[])].map(k=>String(k).trim()).filter(Boolean))].slice(0,12);
     const e={name,keys,content,priority:Math.min(10,Math.max(1,Math.round(Number(r.priority))||5)),turn:d.turn};
     const i=d.entries.findIndex(x=>x.name.toLowerCase()===name.toLowerCase());
     if(i>=0){ d.entries[i]=e; updated++; } else { d.entries.push(e); created++; }
@@ -1217,7 +1072,7 @@ function loadLorebookFile(ev){
   catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; renderLorebookModal(); ev.target.value=""; return; }
   const reader=new FileReader();
   reader.onload=fev=>{
-    try{ S.lorebook=normalizeLorebook(parseImportJSON(fev.target.result,LORE_FILE_MAX_CHARS)); S.lorebookMsg={ok:true,text:`Loaded "${S.lorebook.name}".`}; }
+    try{ S.lorebook=normalizeLorebook(safeParseFileJSON(fev.target.result,LORE_FILE_MAX_CHARS)); S.lorebookMsg={ok:true,text:`Loaded "${S.lorebook.name}".`}; }
     catch(e){ S.lorebookMsg={ok:false,text:`Couldn't load lorebook: ${e.message}`}; }
     persistSession(); renderLorebookModal(); refreshLorebookSetupRow(); ev.target.value="";
   };
@@ -1265,6 +1120,1061 @@ function openLorebook(){ S.lorebookOpen=true; S.lorebookMsg=null; renderLorebook
 function closeLorebook(){ S.lorebookOpen=false; renderLorebookModal(); }
 function refreshLorebookSetupRow(){ const el=document.getElementById("loreSetupSummary"); if(el) el.textContent=lorebookSummary(); }
 
+/* ============================== RULEBOOK ============================== */
+const RB_SCHEMA={"$schema":"http://json-schema.org/draft-07/schema#","title":"Rulebook import (rulebook/v1-draft)","type":"object","required":["schema","rulebook"],"additionalProperties":false,"properties":{"schema":{"const":"rulebook/v1-draft"},"exported_at":{"type":"string"},"rulebook":{"type":"object","required":["id","name","meters"],"additionalProperties":false,"properties":{"id":{"type":"string","minLength":1,"maxLength":64},"name":{"type":"string","minLength":1,"maxLength":60},"description":{"type":"string","maxLength":800},"meters":{"type":"array","minItems":1,"maxItems":15,"items":{"$ref":"#/definitions/meter"}},"combined_rules":{"type":"array","maxItems":30,"items":{"$ref":"#/definitions/combinedRule"}},"meter_triggers":{"type":"array","items":{"$ref":"#/definitions/triggerGroup"}}}}},"definitions":{"id":{"type":"string","pattern":"^[a-z][a-z0-9_-]{0,63}$","not":{"enum":["constructor","prototype","lists"]}},"itemId":{"type":"string","pattern":"^[a-z0-9_-]{1,40}$"},"text":{"type":"string"},"color":{"enum":["amber","blue","contrast","cream","crimson","cyan","emerald","gray","green","indigo","lime","magenta","mint","ochre","olive","orange","peach","petrol","pink","powder","purple","red","royal","rust","salmon","sky","teal","yellow"]},"level":{"type":"object","required":["label","to"],"additionalProperties":false,"properties":{"label":{"type":"string","minLength":1,"maxLength":40},"to":{"type":["number","null"]},"instr":{"type":"string","maxLength":600},"caption":{"type":"string","maxLength":120},"revealed":{"type":"boolean"},"override":{"type":"boolean"}}},"levels":{"type":"array","minItems":2,"maxItems":12,"items":{"$ref":"#/definitions/level"}},"valueOp":{"enum":[">=","<=",">","<","="]},"clockOp":{"enum":["tod","day>=","day<=","day=","weekday","date"]},"listOp":{"enum":["is","is_not","has>=","has<=","holds>=","holds<="]},"journalOp":{"enum":["gte","lte"]},"journalItem":{"type":"object","required":["id","label"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/itemId"},"label":{"type":"string","minLength":1,"maxLength":40},"icon":{"type":"string","maxLength":32},"hint":{"type":"string","maxLength":200},"revealed":{"type":"boolean"},"at_start":{"const":true},"repeat":{"const":true},"cues":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":40}}}},"journalRule":{"type":"object","required":["id","op"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/id"},"op":{"enum":["recorded","not_recorded","recorded_at_least","recorded_nothing"]},"item":{"$ref":"#/definitions/itemId"},"v":{"type":"integer","minimum":1},"instr":{"type":"string","maxLength":600},"caption":{"type":"string","maxLength":120}},"allOf":[{"if":{"properties":{"op":{"enum":["recorded","not_recorded"]}}},"then":{"required":["item"]}},{"if":{"properties":{"op":{"const":"recorded_at_least"}}},"then":{"required":["v"]}},{"if":{"properties":{"op":{"const":"recorded_nothing"}}},"then":{"not":{"anyOf":[{"required":["item"]},{"required":["v"]}]}}}]},"condition":{"type":"object","required":["m","op"],"additionalProperties":false,"properties":{"m":{"$ref":"#/definitions/id"},"op":{"anyOf":[{"$ref":"#/definitions/valueOp"},{"$ref":"#/definitions/clockOp"},{"$ref":"#/definitions/listOp"},{"$ref":"#/definitions/journalOp"}]},"v":{"type":"number"},"days":{"type":"array","items":{"type":"integer","minimum":0,"maximum":6}},"month":{"type":"integer","minimum":1,"maximum":12},"day":{"type":"integer","minimum":1,"maximum":31},"year":{"type":"integer","minimum":100,"maximum":9999},"item":{"$ref":"#/definitions/itemId"},"since":{"enum":["turns","days"]}},"allOf":[{"if":{"properties":{"op":{"enum":[">=","<=",">","<","=","\u2265","\u2264","tod","day>=","day<=","day=","day\u2265","day\u2264","has>=","has<=","holds>=","holds<="]}},"required":["op"]},"then":{"required":["v"]}},{"if":{"properties":{"op":{"enum":["is","is_not","has>=","has<="]}},"required":["op"]},"then":{"required":["item"]}},{"if":{"properties":{"op":{"enum":["weekday","weekday_is"]}},"required":["op"]},"then":{"required":["days"],"properties":{"days":{"minItems":1}}}},{"if":{"properties":{"op":{"enum":["date","date_is"]}},"required":["op"]},"then":{"required":["month","day"]}},{"if":{"properties":{"op":{"enum":["gte","lte"]}},"required":["op"]},"then":{"required":["item","v"],"properties":{"v":{"type":"integer","minimum":0}}}}]},"conditions":{"type":"array","minItems":1,"maxItems":6,"items":{"$ref":"#/definitions/condition"}},"change":{"oneOf":[{"type":"object","required":["d"],"properties":{"d":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}},"not":{"anyOf":[{"required":["set"]},{"required":["x"]},{"required":["div"]},{"required":["rand"]}]}},{"type":"object","required":["set"],"properties":{"set":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}},"not":{"anyOf":[{"required":["d"]},{"required":["x"]},{"required":["div"]},{"required":["rand"]}]}},{"type":"object","required":["x"],"properties":{"x":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}},"not":{"anyOf":[{"required":["d"]},{"required":["set"]},{"required":["div"]},{"required":["rand"]}]}},{"type":"object","required":["div"],"properties":{"div":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}},"not":{"anyOf":[{"required":["d"]},{"required":["set"]},{"required":["x"]},{"required":["rand"]}]}},{"type":"object","required":["rand"],"properties":{"rand":{"$ref":"#/definitions/randRange"}},"not":{"anyOf":[{"required":["d"]},{"required":["set"]},{"required":["x"]},{"required":["div"]},{"required":["m"]}]}}]},"operandMeter":{"type":"string","description":"Id of a bar, pips, number or dice meter whose current value the amount is multiplied by."},"randRange":{"type":"object","required":["rmin","rmax"],"additionalProperties":false,"properties":{"rmin":{"type":"integer"},"rmax":{"type":"integer"}}},"aiRule":{"allOf":[{"$ref":"#/definitions/change"}],"type":"object","required":["id","when"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/id"},"d":{"type":"number"},"set":{"type":"number"},"x":{"type":"number"},"div":{"type":"number"},"rand":{"$ref":"#/definitions/randRange"},"m":{"$ref":"#/definitions/operandMeter"},"when":{"type":"string","minLength":1,"maxLength":300},"cooldown":{"type":"integer","minimum":-1},"if":{"type":"object","required":["when"],"additionalProperties":false,"properties":{"match":{"enum":["all","any"]},"when":{"$ref":"#/definitions/triggerConditions"}}}}},"ai":{"type":"object","additionalProperties":false,"properties":{"on":{"type":"boolean"},"rules":{"type":"array","maxItems":60,"items":{"$ref":"#/definitions/aiRule"}},"lo":{"type":"number","maximum":0},"hi":{"type":"number","minimum":0},"negOverrides":{"type":"boolean"},"mode":{"enum":["rules","extract"]},"extractHint":{"type":"string","maxLength":200}}},"keyword":{"allOf":[{"oneOf":[{"type":"object","required":["delta"],"not":{"required":["set"]}},{"type":"object","required":["set"],"not":{"required":["delta"]}}]}],"type":"object","required":["words"],"additionalProperties":false,"properties":{"words":{"type":"array","minItems":1,"maxItems":50,"items":{"type":"string","minLength":1,"maxLength":64}},"delta":{"type":"number"},"set":{"type":"number"}}},"listItem":{"type":"object","required":["id","label"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/itemId"},"label":{"type":"string","minLength":1,"maxLength":40},"icon":{"type":"string","maxLength":32},"hint":{"type":"string"},"instruction":{"type":"string","maxLength":600},"caption":{"type":"string","maxLength":120},"revealed":{"type":"boolean"},"kind":{"enum":["held","counted"]},"start":{"type":"integer","minimum":0},"max":{"type":"integer","minimum":1,"maximum":9999}}},"collectionRule":{"type":"object","required":["id","op","v"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/id"},"op":{"enum":["has>=","has<=","holds>=","holds<="]},"v":{"type":"integer","minimum":0},"item":{"$ref":"#/definitions/itemId"},"instr":{"type":"string","maxLength":600},"caption":{"type":"string","maxLength":120}},"allOf":[{"if":{"properties":{"op":{"enum":["has>=","has<="]}},"required":["op"]},"then":{"required":["item"]}}]},"rollWhen":{"type":"object","additionalProperties":false,"properties":{"every_turns":{"type":"integer","minimum":1},"keywords":{"type":"array","items":{"type":"string","minLength":1,"maxLength":64}},"ai_conditions":{"type":"array","items":{"type":"object","required":["id","condition"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/id"},"condition":{"type":"string","minLength":1,"maxLength":300}}}},"meter_conditions":{"type":"object","required":["match","conditions","fire"],"additionalProperties":false,"properties":{"match":{"enum":["all","any"]},"conditions":{"type":"array","minItems":1,"maxItems":6,"items":{"type":"object","required":["meter_id","op","value"],"properties":{"meter_id":{"$ref":"#/definitions/id"},"op":{"type":"string"},"value":{"type":"number"}}}},"fire":{"enum":["cross","every_turn","every_n_turns","once"]},"every_turns":{"type":"integer","minimum":1}}},"meter_rises":{"type":"array","items":{"$ref":"#/definitions/id"}},"match":{"enum":["all","any"]},"cooldown":{"type":"integer","minimum":1,"maximum":999}}},"meterCommon":{"type":"object","required":["id","type","label","visible"],"properties":{"id":{"$ref":"#/definitions/id"},"type":{"enum":["bar","pips","number","clock","dice","select","collection","journal"]},"label":{"type":"string","minLength":1,"maxLength":40},"icon":{"type":"string","maxLength":32},"color":{"$ref":"#/definitions/color"},"tracks":{"enum":["user","character","chat"]},"visible":{"anyOf":[{"type":"boolean"},{"enum":["shown","hidden"]}]},"hud":{"enum":["strip","panel","hidden"]},"userEditable":{"type":"boolean"},"raises":{"type":"array","items":{"type":"string"}},"lowers":{"type":"array","items":{"type":"string"}},"tellModel":{"type":"boolean"}}},"commonKeys":{"enum":["id","type","label","icon","color","tracks","visible","hud","userEditable","raises","lowers","tellModel"]},"meter":{"allOf":[{"$ref":"#/definitions/meterCommon"}],"oneOf":[{"properties":{"type":{"enum":["bar","pips"]},"visible":{"type":"boolean"},"min":{"type":"number"},"max":{"type":"number"},"def":{"type":"number"},"decay":{"type":"number"},"decay_every":{"type":"integer","minimum":1},"keywords":{"type":"array","maxItems":20,"items":{"$ref":"#/definitions/keyword"}},"ai":{"$ref":"#/definitions/ai"},"bands":{"$ref":"#/definitions/levels"}},"required":["tracks","bands"],"propertyNames":{"anyOf":[{"$ref":"#/definitions/commonKeys"},{"enum":["min","max","def","decay","decay_every","keywords","ai","bands"]}]}},{"properties":{"type":{"const":"number"},"visible":{"type":"boolean"},"def":{"type":"number"},"unit":{"type":"string","maxLength":16},"decimals":{"enum":[0,1,2]},"display":{"enum":["number","level"]},"perMsg":{"type":"number"},"spend":{"type":"boolean"},"keywords":{"type":"array","maxItems":20,"items":{"$ref":"#/definitions/keyword"}},"ai":{"$ref":"#/definitions/ai"},"bands":{"$ref":"#/definitions/levels"}},"required":["tracks","bands"],"propertyNames":{"anyOf":[{"$ref":"#/definitions/commonKeys"},{"enum":["def","unit","decimals","display","perMsg","spend","keywords","ai","bands"]}]}},{"properties":{"type":{"const":"clock"},"visible":{"type":"boolean"},"tracks":{"const":"chat"},"mode":{"enum":["datetime","date"]},"display":{"enum":["calendar","daycount"]},"start":{"type":"string","pattern":"^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2})?$"},"stepMin":{"type":"number","minimum":0,"maximum":525600,"multipleOf":0.25},"stepEvery":{"type":"integer","minimum":0},"skips":{"type":"boolean"},"skipMode":{"enum":["rules","extract"]},"ruleDims":{"type":"array","maxItems":2,"items":{"enum":["tod","day"]}},"todBands":{"type":"array","maxItems":12,"items":{"$ref":"#/definitions/level"}},"dayBands":{"type":"array","maxItems":12,"items":{"$ref":"#/definitions/level"}}},"required":["tracks"],"propertyNames":{"anyOf":[{"$ref":"#/definitions/commonKeys"},{"enum":["mode","display","start","stepMin","stepEvery","skips","skipMode","ruleDims","todBands","dayBands"]}]},"allOf":[{"if":{"required":["ruleDims"],"properties":{"ruleDims":{"contains":{"const":"tod"}}}},"then":{"required":["todBands"],"properties":{"todBands":{"minItems":1}}}},{"if":{"required":["ruleDims"],"properties":{"ruleDims":{"contains":{"const":"day"}}}},"then":{"required":["dayBands"],"properties":{"dayBands":{"minItems":1}}}},{"anyOf":[{"required":["todBands"],"properties":{"todBands":{"minItems":1}}},{"required":["dayBands"],"properties":{"dayBands":{"minItems":1}}}]}]},{"properties":{"type":{"const":"dice"},"visible":{"type":"boolean"},"sides":{"type":"integer","minimum":2,"maximum":1000},"rollWhen":{"$ref":"#/definitions/rollWhen"},"timing":{"enum":["before_reply","after_meters"]},"lasts":{"type":"integer","minimum":1},"bands":{"$ref":"#/definitions/levels"},"userEditable":{"const":false}},"required":["tracks","sides","bands"],"propertyNames":{"anyOf":[{"$ref":"#/definitions/commonKeys"},{"enum":["sides","rollWhen","timing","lasts","bands"]}]},"if":{"required":["rollWhen"],"properties":{"rollWhen":{"required":["ai_conditions"]}}},"then":{"required":["timing"],"properties":{"timing":{"const":"after_meters"}}}},{"properties":{"type":{"const":"select"},"visible":{"type":"boolean"},"items":{"type":"array","minItems":2,"maxItems":20,"items":{"$ref":"#/definitions/listItem"}},"def":{"$ref":"#/definitions/itemId"},"detectHint":{"type":"string"},"userEditable":{"type":"boolean"}},"required":["tracks","items"],"propertyNames":{"anyOf":[{"$ref":"#/definitions/commonKeys"},{"enum":["items","def","detectHint"]}]}},{"properties":{"type":{"const":"collection"},"visible":{"type":"boolean"},"items":{"type":"array","minItems":1,"maxItems":20,"items":{"$ref":"#/definitions/listItem"}},"rules":{"type":"array","maxItems":20,"items":{"$ref":"#/definitions/collectionRule"}},"detectHint":{"type":"string"},"userEditable":{"type":"boolean"}},"required":["tracks","items"],"propertyNames":{"anyOf":[{"$ref":"#/definitions/commonKeys"},{"enum":["items","rules","detectHint"]}]}},{"properties":{"type":{"const":"journal"},"reads":{"enum":["user","bot","all"]},"visible":{"enum":["shown","hidden"]},"items":{"type":"array","minItems":1,"maxItems":30,"items":{"$ref":"#/definitions/journalItem"}},"journal_rules":{"type":"array","maxItems":20,"items":{"$ref":"#/definitions/journalRule"}},"detectHint":{"type":"string","maxLength":200}},"required":["items"],"propertyNames":{"anyOf":[{"$ref":"#/definitions/commonKeys"},{"enum":["reads","items","journal_rules","detectHint"]}]}}]},"combinedRule":{"type":"object","required":["id","conds","instr"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/id"},"conds":{"$ref":"#/definitions/conditions"},"instr":{"type":"string","minLength":1,"maxLength":600},"caption":{"type":"string","maxLength":120}}},"trigger":{"type":"object","required":["id","when","do"],"additionalProperties":false,"properties":{"id":{"$ref":"#/definitions/id"},"match":{"enum":["all","any"]},"when":{"$ref":"#/definitions/triggerConditions"},"do":{"oneOf":[{"type":"object","required":["d"],"additionalProperties":false,"properties":{"d":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}}},{"type":"object","required":["set"],"additionalProperties":false,"properties":{"set":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}}},{"type":"object","required":["x"],"additionalProperties":false,"properties":{"x":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}}},{"type":"object","required":["div"],"additionalProperties":false,"properties":{"div":{"type":"number"},"m":{"$ref":"#/definitions/operandMeter"}}},{"type":"object","anyOf":[{"required":["min"]},{"required":["max"]}],"additionalProperties":false,"properties":{"min":{"type":"number"},"max":{"type":"number"}}}]},"fire":{"enum":["cross","every_turn","every_n_turns","once"]},"every_turns":{"type":"integer","minimum":1}}},"triggerGroup":{"type":"object","required":["m","triggers"],"additionalProperties":false,"properties":{"m":{"$ref":"#/definitions/id"},"on":{"type":"boolean"},"triggers":{"type":"array","minItems":1,"maxItems":10,"items":{"$ref":"#/definitions/trigger"}}}},"triggerCondition":{"type":"object","required":["m","op"],"additionalProperties":false,"properties":{"m":{"$ref":"#/definitions/id"},"op":{"anyOf":[{"enum":[">=","<=",">","<","="]},{"$ref":"#/definitions/clockOp"},{"enum":["is","is_not","has>=","has<=","holds>="]},{"enum":["gte","lte"]}]},"v":{"type":"number"},"days":{"type":"array","items":{"type":"integer","minimum":0,"maximum":6}},"month":{"type":"integer","minimum":1,"maximum":12},"day":{"type":"integer","minimum":1,"maximum":31},"year":{"type":"integer","minimum":100,"maximum":9999},"item":{"$ref":"#/definitions/itemId"},"since":{"enum":["turns","days"]}},"allOf":[{"if":{"properties":{"op":{"enum":[">=","<=",">","<","=","\u2265","\u2264","tod","day>=","day<=","day=","day\u2265","day\u2264","has>=","has<=","holds>=","holds<="]}},"required":["op"]},"then":{"required":["v"]}},{"if":{"properties":{"op":{"enum":["is","is_not","has>=","has<="]}},"required":["op"]},"then":{"required":["item"]}},{"if":{"properties":{"op":{"enum":["weekday","weekday_is"]}},"required":["op"]},"then":{"required":["days"],"properties":{"days":{"minItems":1}}}},{"if":{"properties":{"op":{"enum":["date","date_is"]}},"required":["op"]},"then":{"required":["month","day"]}},{"if":{"properties":{"op":{"enum":["gte","lte"]}},"required":["op"]},"then":{"required":["item","v"],"properties":{"v":{"type":"integer","minimum":0}}}}]},"triggerConditions":{"type":"array","minItems":1,"maxItems":6,"items":{"$ref":"#/definitions/triggerCondition"}}}};
+const RB_MAX_FILE_CHARS=1500000;
+/* ---- Schema validator: the draft-07 subset the rulebook schema uses ---- */
+const RB_NUM=new Set(["bar","pips","number"]);
+function rbRef(ref){ let o=RB_SCHEMA; for(const k of ref.replace(/^#\/?/,"").split("/").filter(Boolean)) o=o[k]; return o; }
+function rbTypeOk(t,v){
+  switch(t){
+    case "string": return typeof v==="string";
+    case "number": return typeof v==="number" && isFinite(v);
+    case "integer": return Number.isInteger(v);
+    case "boolean": return typeof v==="boolean";
+    case "null": return v===null;
+    case "object": return v!==null && typeof v==="object" && !Array.isArray(v);
+    case "array": return Array.isArray(v);
+  }
+  return false;
+}
+function rbEq(a,b){ return JSON.stringify(a)===JSON.stringify(b); }
+function rbBranchFor(branches,v){
+  if(!v || typeof v!=="object" || Array.isArray(v) || v.type===undefined) return -1;
+  return branches.findIndex(b=>{ const p=b.properties&&b.properties.type; return p && ((p.const!==undefined && p.const===v.type) || (p.enum && p.enum.includes(v.type))); });
+}
+/* Returns a list of {path,msg}; an empty list means the value is valid. */
+function rbCheck(s,v,path){
+  if(s===true || s===undefined) return [];
+  if(s.$ref) return rbCheck(rbRef(s.$ref),v,path); // draft-07: siblings of $ref are ignored
+  const E=[]; const add=(m,p)=>E.push({path:p===undefined?path:p,msg:m});
+  if(s.type){
+    const ts=Array.isArray(s.type)?s.type:[s.type];
+    if(!ts.some(t=>rbTypeOk(t,v))){ add(`must be ${ts.join(" or ")}`); return E; }
+  }
+  if(s.enum && !s.enum.some(x=>rbEq(x,v))) add(`must be one of: ${s.enum.slice(0,30).join(", ")}`);
+  if("const" in s && !rbEq(s.const,v)) add(`must be ${JSON.stringify(s.const)}`);
+  if(typeof v==="string"){
+    const n=[...v].length;
+    if(s.minLength!==undefined && n<s.minLength) add(n===0?"must not be empty":`must be at least ${s.minLength} characters`);
+    if(s.maxLength!==undefined && n>s.maxLength) add(`is ${n} characters long (max ${s.maxLength})`);
+    if(s.pattern && !new RegExp(s.pattern).test(v)) add(`has an invalid format ("${v.slice(0,40)}")`);
+  }
+  if(typeof v==="number"){
+    if(s.minimum!==undefined && v<s.minimum) add(`must be at least ${s.minimum}`);
+    if(s.maximum!==undefined && v>s.maximum) add(`must be at most ${s.maximum}`);
+    if(s.multipleOf!==undefined){ const q=v/s.multipleOf; if(Math.abs(q-Math.round(q))>1e-9) add(`must be a multiple of ${s.multipleOf}`); }
+  }
+  if(Array.isArray(v)){
+    if(s.minItems!==undefined && v.length<s.minItems) add(`needs at least ${s.minItems} item${s.minItems===1?"":"s"}`);
+    if(s.maxItems!==undefined && v.length>s.maxItems) add(`has ${v.length} items (max ${s.maxItems})`);
+    if(s.items && typeof s.items==="object" && !Array.isArray(s.items)) v.forEach((x,i)=>E.push(...rbCheck(s.items,x,`${path}[${i}]`)));
+    if(s.contains && !v.some(x=>rbCheck(s.contains,x,path).length===0)) add("is missing a required entry");
+  }
+  if(rbTypeOk("object",v)){
+    if(s.required) for(const k of s.required) if(!(k in v)) add(`is missing required field "${k}"`,path);
+    if(s.properties) for(const k of Object.keys(s.properties)) if(k in v) E.push(...rbCheck(s.properties[k],v[k],path?`${path}.${k}`:k));
+    if(s.additionalProperties===false){
+      const known=s.properties||{};
+      for(const k of Object.keys(v)) if(!(k in known)) add(`unknown field "${k}"`,path);
+    } else if(s.additionalProperties && typeof s.additionalProperties==="object"){
+      const known=s.properties||{};
+      for(const k of Object.keys(v)) if(!(k in known)) E.push(...rbCheck(s.additionalProperties,v[k],path?`${path}.${k}`:k));
+    }
+    if(s.propertyNames) for(const k of Object.keys(v)) if(rbCheck(s.propertyNames,k,path).length) add(`field "${k}" is not allowed for this kind of meter`,path);
+  }
+  if(s.allOf) for(const sub of s.allOf) E.push(...rbCheck(sub,v,path));
+  if(s.anyOf){
+    const per=s.anyOf.map(b=>rbCheck(b,v,path));
+    if(!per.some(e=>e.length===0)){ const i=rbBranchFor(s.anyOf,v); if(i>=0) E.push(...per[i]); else add("does not match any allowed form"); }
+  }
+  if(s.oneOf){
+    const per=s.oneOf.map(b=>rbCheck(b,v,path));
+    const ok=per.filter(e=>e.length===0).length;
+    if(ok===0){ const i=rbBranchFor(s.oneOf,v); if(i>=0) E.push(...per[i]); else add("does not match any allowed form"); }
+    else if(ok>1) add("matches more than one allowed form");
+  }
+  if(s.not && rbCheck(s.not,v,path).length===0) add("uses a value that is not allowed here");
+  if(s.if){
+    if(rbCheck(s.if,v,path).length===0){ if(s.then) E.push(...rbCheck(s.then,v,path)); }
+    else if(s.else) E.push(...rbCheck(s.else,v,path));
+  }
+  return E;
+}
+function rbValidateSchema(doc){
+  const seen=new Set(), out=[];
+  for(const e of rbCheck(RB_SCHEMA,doc,"")){ const k=e.path+"|"+e.msg; if(!seen.has(k)){ seen.add(k); out.push(e); } }
+  return out;
+}
+
+/* ---- Import: schema check, then the cross-reference rules the schema can't express ---- */
+function rbCleanKeywords(rb){
+  let dropped=0;
+  const clean=a=>{ const n=a.length; const r=a.map(w=>String(w).trim().replace(/\*+/g,"*")).filter(w=>/[\p{L}\p{N}]/u.test(w) && (w.match(/\*/g)||[]).length<=2); dropped+=n-r.length; return r; };
+  for(const m of rb.meters){
+    if(Array.isArray(m.keywords)){ for(const kw of m.keywords) kw.words=clean(kw.words); m.keywords=m.keywords.filter(kw=>kw.words.length); }
+    if(m.type==="journal") for(const it of m.items) if(Array.isArray(it.cues)) it.cues=clean(it.cues);
+    if(m.type==="dice"&&m.rollWhen&&Array.isArray(m.rollWhen.keywords)) m.rollWhen.keywords=clean(m.rollWhen.keywords);
+  }
+  return dropped;
+}
+function rbSemantic(rb){
+  const errors=[], warnings=[]; const E=m=>errors.push(m), W=m=>warnings.push(m);
+  const idRe=/^[a-z][a-z0-9_-]{0,63}$/;
+  if(!idRe.test(rb.id)) E(`Rulebook id "${rb.id}" may only use lowercase letters, digits and "-", and must start with a letter.`);
+  const byId=new Map();
+  for(const m of rb.meters){ if(byId.has(m.id)) E(`Duplicate meter id "${m.id}".`); byId.set(m.id,m); }
+  const operandOk=t=>t==="bar"||t==="pips"||t==="number"||t==="dice";
+  const refCheck=(id,where)=>{ if(!byId.has(id)) E(`${where} names the meter "${id}", which doesn't exist.`); return byId.get(id); };
+  const condRefs=(list,where)=>{ for(const c of (list||[])) refCheck(c.m,where); };
+  let strip=0, questions=0, anyColl=false, anyJournal=false;
+  for(const m of rb.meters){
+    const vis=m.visible===true||m.visible==="shown";
+    if(vis && m.hud!=="panel" && m.hud!=="hidden") strip++;
+    const items=m.items||[]; const seen=new Set();
+    for(const it of items){ if(seen.has(it.id)) E(`Meter "${m.label}" has a duplicate item id "${it.id}".`); seen.add(it.id); }
+    const b=m.bands||m.todBands||[];
+    for(let i=1;i<b.length;i++){
+      if(b[i-1].to===null) E(`Meter "${m.label}": only the last level can end with null.`);
+      else if(b[i].to!==null && b[i].to<b[i-1].to) E(`Meter "${m.label}": levels must go from the lowest value to the highest.`);
+    }
+    if(b.length && (m.type==="bar"||m.type==="pips"||m.type==="dice") && b[b.length-1].to===null) E(`Meter "${m.label}": the last level's "to" must be the maximum, not null.`);
+    if(m.type==="pips" && Number.isFinite(m.max) && (m.max-(Number.isFinite(m.min)?m.min:0))>10) E(`Meter "${m.label}": pips can have at most 10 steps.`);
+    if((m.type==="bar"||m.type==="pips") && Number.isFinite(m.min) && Number.isFinite(m.max) && m.min>=m.max) E(`Meter "${m.label}": min must be lower than max.`);
+    const ai=m.ai;
+    if(ai){
+      if(ai.mode==="extract") questions+=1; else questions+=(ai.rules||[]).length;
+      const rid=new Set();
+      for(const r of (ai.rules||[])){
+        if(rid.has(r.id)) E(`Meter "${m.label}" has a duplicate rule id "${r.id}".`); rid.add(r.id);
+        if(r.m!==undefined){ const t=refCheck(r.m,`A rule on "${m.label}"`); if(t){ if(!operandOk(t.type)) E(`A rule on "${m.label}" reads "${r.m}", which is not a bar, pips, number or dice meter.`); if(r.m===m.id) E(`A rule on "${m.label}" cannot read its own meter.`); } }
+        if(r.if) condRefs(r.if.when,`The "Only when" of a rule on "${m.label}"`);
+      }
+    }
+    if(m.type==="select") questions+=1;
+    if(m.type==="clock" && m.skips===true) questions+=2;
+    if(m.type==="dice"){ const rw=m.rollWhen||{}; questions+=(rw.ai_conditions||[]).length; for(const c of ((rw.meter_conditions||{}).conditions||[])) refCheck(c.meter_id,`The dice "${m.label}"`); for(const x of (rw.meter_rises||[])) refCheck(x,`The dice "${m.label}"`); }
+    if(m.type==="collection") anyColl=true;
+    if(m.type==="journal") anyJournal=true;
+  }
+  if(anyColl) questions+=1; if(anyJournal) questions+=1;
+  if(strip>8) E(`${strip} meters are set to show in the HUD strip; at most 8 are allowed (use "hud": "panel" for the rest).`);
+  if(questions>60) E(`The rulebook asks the AI ${questions} questions per message; the limit is 60.`);
+  const owners=new Set((rb.meter_triggers||[]).map(g=>g.m));
+  for(const g of (rb.meter_triggers||[])){
+    const t=refCheck(g.m,"A trigger group");
+    if(t && !RB_NUM.has(t.type)) E(`Triggers can only move bar, pips or number meters ("${g.m}" is ${t.type}).`);
+    const tid=new Set(); // trigger ids only need to be unique within one meter's triggers
+    for(const tr of g.triggers){
+      if(tid.has(tr.id)) E(`Meter "${g.m}" has a duplicate trigger id "${tr.id}".`); tid.add(tr.id);
+      for(const c of (tr.when||[])){
+        refCheck(c.m,`Trigger "${tr.id}"`);
+        if(c.m===g.m) E(`Trigger "${tr.id}" watches the meter it moves ("${g.m}").`);
+        else if(owners.has(c.m)) E(`Trigger "${tr.id}" watches "${c.m}", which another trigger moves; triggers never chain.`);
+      }
+      if(tr.do && tr.do.m!==undefined) refCheck(tr.do.m,`Trigger "${tr.id}"`);
+    }
+  }
+  const clocks=rb.meters.filter(m=>m.type==="clock");
+  if(clocks.length>1) E("A rulebook can have only one Story Clock.");
+  for(const c of clocks){
+    if(c.start===undefined) continue;
+    let ok=false; const mt=/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/.exec(c.start);
+    if(mt){ const y=+mt[1],mo=+mt[2],d=+mt[3],dt=new Date(Date.UTC(y,mo-1,d)); ok=y>=100&&dt.getUTCFullYear()===y&&dt.getUTCMonth()===mo-1&&dt.getUTCDate()===d&&(mt[4]===undefined||(+mt[4]<=23&&+mt[5]<=59)); }
+    if(!ok) E(`The Story Clock's start "${c.start}" isn't a real date and time.`);
+  }
+  const OPS={num:[">=","<=",">","<","="],clock:["tod","day>=","day<=","day=","weekday","date"],select:["is","is_not"],collection:["has>=","has<=","holds>=","holds<="],journal:["gte","lte"]};
+  const condCheck=(c,where)=>{
+    const t=byId.get(c.m); if(!t) return;
+    const k=(t.type==="bar"||t.type==="pips"||t.type==="number"||t.type==="dice")?"num":t.type;
+    if(!OPS[k].includes(c.op)) W(`${where} uses "${c.op}" on "${t.label}" (${t.type}), which can never match.`);
+    else if(c.item!==undefined&&t.items&&!t.items.some(i=>i.id===c.item)) W(`${where} names an item "${c.item}" that "${t.label}" doesn't have.`);
+    if(c.since==="days"&&!clocks.length) W(`${where} counts days, but the rulebook has no Story Clock.`);
+  };
+  for(const m of rb.meters){
+    for(const r of ((m.ai&&m.ai.rules)||[])) if(r.if) for(const c of r.if.when) condCheck(c,`A rule on "${m.label}"`);
+    if(m.type==="collection") for(const r of (m.rules||[])) if(r.item!==undefined&&!m.items.some(i=>i.id===r.item)) W(`A rule on "${m.label}" names an item "${r.item}" that doesn't exist.`);
+    if(m.type==="journal") for(const r of (m.journal_rules||[])) if(r.item!==undefined&&!m.items.some(i=>i.id===r.item)) W(`A rule on "${m.label}" names an event "${r.item}" that doesn't exist.`);
+  }
+  for(const g of (rb.meter_triggers||[])) for(const tr of g.triggers) for(const c of tr.when) condCheck(c,`Trigger "${tr.id}"`);
+  for(const c of (rb.combined_rules||[])) for(const x of c.conds) condCheck(x,`Combined rule "${c.id}"`);
+  const cid=new Set();
+  for(const c of (rb.combined_rules||[])){ if(cid.has(c.id)) E(`Duplicate combined rule id "${c.id}".`); cid.add(c.id); condRefs(c.conds,`Combined rule "${c.id}"`); }
+  return {errors,warnings};
+}
+function rbImport(doc){
+  const se=rbValidateSchema(doc);
+  if(se.length) return {errors:se.slice(0,15).map(e=>`${e.path||"(file)"}: ${e.msg}`),warnings:[],rb:null};
+  const rb=JSON.parse(JSON.stringify(doc.rulebook));
+  const dropped=rbCleanKeywords(rb);
+  const sem=rbSemantic(rb);
+  const warnings=[...sem.warnings]; if(dropped) warnings.push(`${dropped} unusable keyword${dropped===1?"":"s"} ignored.`);
+  return {errors:sem.errors.slice(0,15),warnings,rb:sem.errors.length?null:rb};
+}
+function rbInactive(rb){ return []; }
+
+/* ---- Default rulebook (used when nothing is loaded) ---- */
+const RB_DEFAULT_DOC={"schema":"rulebook/v1-draft","rulebook":{"id":"health-fatigue","name":"Health & Fatigue","description":"A simple built-in rulebook that tracks how hurt and how tired the player is.","meters":[
+ {"id":"health","type":"pips","label":"Health","icon":"heart","color":"red","tracks":"chat","visible":true,"min":0,"max":5,"def":5,
+  "raises":["Resting, medicine and healing"],"lowers":["Injuries, wounds and blows"],
+  "ai":{"on":true,"lo":-3,"hi":2,"rules":[
+   {"id":"hurt","d":-1,"when":"{{user}} is hit, cut, burned or otherwise physically hurt."},
+   {"id":"badly-hurt","d":-2,"when":"{{user}} suffers a serious injury, such as a deep wound, a bad fall or a crushing blow."},
+   {"id":"tended","d":1,"when":"{{user}} is bandaged, tended to, uses medicine or rests properly to recover."},
+   {"id":"healed","d":2,"when":"{{user}} receives powerful healing, such as strong magic or a skilled healer's full care."}]},
+  "bands":[
+   {"label":"Defeated","to":0,"instr":"{{user}} is at death's door: barely conscious and unable to fight or flee. Any further harm could be fatal.","caption":"At death's door."},
+   {"label":"Critical","to":1,"instr":"{{user}} is badly wounded: every movement hurts, speech is strained and anything strenuous is nearly impossible.","caption":"Badly wounded."},
+   {"label":"Wounded","to":3,"instr":"{{user}} is hurt and it shows: limping or favouring an injury, wincing, slower and less sure than usual.","caption":"Hurt, but on their feet."},
+   {"label":"Unhurt","to":5,"instr":"{{user}} is in good health and moves freely.","caption":"In good health."}]},
+ {"id":"fatigue","type":"bar","label":"Fatigue","icon":"bolt","color":"amber","tracks":"chat","visible":true,"min":0,"max":100,"def":10,
+  "raises":["Fighting, running, climbing and long ordeals"],"lowers":["Eating, resting and sleeping"],
+  "ai":{"on":true,"lo":-40,"hi":25,"rules":[
+   {"id":"exertion","d":10,"when":"{{user}} exerts themselves hard: fighting, running, climbing, hauling or marching for a long while."},
+   {"id":"ordeal","d":20,"when":"{{user}} goes through an exhausting ordeal, such as a long fight, a forced march or a sleepless night."},
+   {"id":"rest","d":-15,"when":"{{user}} eats, drinks or takes a proper rest for a while."},
+   {"id":"sleep","d":-40,"when":"{{user}} sleeps through the night or rests for many hours."}]},
+  "bands":[
+   {"label":"Fresh","to":25,"instr":"{{user}} is rested and alert.","caption":"Rested and alert."},
+   {"label":"Tired","to":50,"instr":"{{user}} is starting to tire: the occasional yawn, a slower pace, a wish for a break.","caption":"Starting to tire."},
+   {"label":"Weary","to":75,"instr":"{{user}} is weary: heavy limbs, short temper, mistakes creeping in. Rest would be welcome.","caption":"Weary and worn."},
+   {"label":"Exhausted","to":100,"instr":"{{user}} is exhausted: stumbling, unfocused and close to collapse. Anything demanding is a struggle.","caption":"Close to collapse."}]}
+]}};
+function rbDefaultRulebook(){ const r=rbImport(RB_DEFAULT_DOC); return {rb:r.rb,source:"default",fileName:"",charName:""}; }
+
+/* ---- State ---- */
+const RB_DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const RB_MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function rbIsNum(m){ return RB_NUM.has(m.type); }
+function rbMeters(){ return S.rulebook&&S.rulebook.rb?S.rulebook.rb.meters:[]; }
+function rbById(id){ return rbMeters().find(m=>m.id===id)||null; }
+function rbClockMeter(){ return rbMeters().find(m=>m.type==="clock")||null; }
+function rbRange(m){
+  if(m.type==="number") return {min:0,max:Infinity};
+  const last=m.bands[m.bands.length-1];
+  const min=Number.isFinite(m.min)?m.min:0;
+  const max=Number.isFinite(m.max)?m.max:(last&&Number.isFinite(last.to)?last.to:100);
+  return {min,max};
+}
+function rbFix(m,v){
+  if(!Number.isFinite(v)) v=0;
+  const r=rbRange(m); v=Math.min(r.max,Math.max(r.min,v));
+  if(m.type==="number"){ const d=[0,1,2].includes(m.decimals)?m.decimals:0; const p=Math.pow(10,d); return Math.round(v*p)/p; }
+  return Math.round(v);
+}
+function rbDefaultValue(m){ return rbFix(m,Number.isFinite(m.def)?m.def:rbRange(m).min); }
+function rbItemStart(it){ return it.kind==="counted"?Math.min(Number.isInteger(it.start)?it.start:0,it.max||9999):(it.start>0?1:0); }
+function rbInitState(rb){
+  rb=rb||(S.rulebook&&S.rulebook.rb);
+  const st={turn:0,values:{},lastFired:{},idle:{},delta:{},clock:null,dice:{},rolled:{},sel:{},coll:{},jrn:{},gate:{}};
+  for(const m of (rb?rb.meters:[])){
+    if(rbIsNum(m)) st.values[m.id]=rbDefaultValue(m);
+    else if(m.type==="clock"){ if(!st.clock) st.clock={t:0,ctr:0}; }
+    else if(m.type==="select"){ st.sel[m.id]=(m.items.some(i=>i.id===m.def)?m.def:m.items[0].id); }
+    else if(m.type==="collection"){ st.coll[m.id]={}; for(const it of m.items) st.coll[m.id][it.id]=rbItemStart(it); }
+    else if(m.type==="journal"){ st.jrn[m.id]=m.items.filter(i=>i.at_start===true).map(i=>({i:i.id,turn:0,t:0})); }
+  }
+  return st;
+}
+/* Rebuild a stored state against a rulebook: only known meters/items, only finite numbers, clamped to range. */
+function rbCleanState(st,rb){
+  const out=rbInitState(rb); if(!st||typeof st!=="object") return out;
+  const own=(o,k)=>!!o&&typeof o==="object"&&Object.prototype.hasOwnProperty.call(o,k);
+  for(const m of rb.meters){
+    if(rbIsNum(m)){
+      const v=own(st.values,m.id)?st.values[m.id]:undefined; if(typeof v==="number"&&Number.isFinite(v)) out.values[m.id]=rbFix(m,v);
+      const i=own(st.idle,m.id)?st.idle[m.id]:undefined; if(Number.isInteger(i)&&i>=0&&i<100000) out.idle[m.id]=i;
+      const d=own(st.delta,m.id)?st.delta[m.id]:undefined; if(typeof d==="number"&&Number.isFinite(d)) out.delta[m.id]=d;
+      for(const r of ((m.ai&&m.ai.rules)||[])){ const k=m.id+":"+r.id; const f=own(st.lastFired,k)?st.lastFired[k]:undefined; if(Number.isInteger(f)&&f>=0) out.lastFired[k]=f; }
+    } else if(m.type==="dice"){
+      const d=own(st.dice,m.id)?st.dice[m.id]:null;
+      if(d&&typeof d==="object"&&Number.isInteger(d.roll)&&d.roll>=1&&d.roll<=m.sides&&Number.isInteger(d.turn)&&d.turn>=0){ out.dice[m.id]={roll:d.roll,turn:d.turn}; out.values[m.id]=d.roll; }
+      const r=own(st.rolled,m.id)?st.rolled[m.id]:undefined; if(Number.isInteger(r)&&r>=0) out.rolled[m.id]=r;
+    } else if(m.type==="select"){
+      const v=own(st.sel,m.id)?st.sel[m.id]:null; if(typeof v==="string"&&m.items.some(i=>i.id===v)) out.sel[m.id]=v;
+    } else if(m.type==="collection"){
+      const o=own(st.coll,m.id)?st.coll[m.id]:null;
+      if(o&&typeof o==="object") for(const it of m.items){ const x=own(o,it.id)?o[it.id]:undefined; if(Number.isInteger(x)&&x>=0) out.coll[m.id][it.id]=it.kind==="counted"?Math.min(x,it.max||9999):Math.min(x,1); }
+    } else if(m.type==="journal"){
+      const a=own(st.jrn,m.id)?st.jrn[m.id]:null;
+      if(Array.isArray(a)){
+        const ids=new Set(m.items.map(i=>i.id));
+        out.jrn[m.id]=a.filter(e=>e&&typeof e==="object"&&typeof e.i==="string"&&ids.has(e.i)&&Number.isInteger(e.turn)&&e.turn>=0&&(e.t===null||(typeof e.t==="number"&&Number.isFinite(e.t)))).slice(-300).map(e=>({i:e.i,turn:e.turn,t:e.t===null?null:e.t}));
+      }
+    }
+  }
+  if(out.clock&&st.clock&&typeof st.clock==="object"){
+    if(typeof st.clock.t==="number"&&Number.isFinite(st.clock.t)) out.clock.t=Math.max(-1e9,Math.min(1e9,st.clock.t));
+    if(Number.isInteger(st.clock.ctr)&&st.clock.ctr>=0&&st.clock.ctr<1e6) out.clock.ctr=st.clock.ctr;
+  }
+  if(st.gate&&typeof st.gate==="object"){
+    let n=0;
+    for(const k of Object.keys(st.gate)){
+      if(n>=300||!/^(t|dice):[A-Za-z0-9_:-]{1,140}$/.test(k)) continue;
+      const g=st.gate[k]; if(!g||typeof g!=="object") continue;
+      out.gate[k]={on:g.on===true,last:Number.isInteger(g.last)&&g.last>=-1?g.last:-1,done:g.done===true}; n++;
+    }
+  }
+  out.turn=Number.isInteger(st.turn)&&st.turn>=0?st.turn:0;
+  return out;
+}
+/* Restore the rulebook + state from a saved game; falls back to the default if the data doesn't validate. */
+function rbRestore(saved,savedState){
+  let rbo=null;
+  if(saved&&typeof saved==="object"&&saved.rb){
+    const r=rbImport({schema:"rulebook/v1-draft",rulebook:saved.rb});
+    if(r.rb) rbo={rb:r.rb,source:saved.source==="file"?"file":"default",fileName:cleanText(saved.fileName||"",120),charName:cleanText(saved.charName||"",60).trim()};
+  }
+  if(!rbo) rbo=rbDefaultRulebook();
+  return {rulebook:rbo,state:rbCleanState(savedState,rbo.rb)};
+}
+
+/* ---- Text helpers ---- */
+function rbCharName(ui){ const n=S.rulebook&&S.rulebook.charName; return n||(ui?"the character":"the character the scene focuses on"); }
+function rbSub(t,ui){ return String(t||"").replace(/\{\{user\}\}/gi,ui?"you":"the player").replace(/\{\{char\}\}/gi,rbCharName(ui)); }
+function rbPick(b,v){ for(let i=0;i<b.length;i++){ if(b[i].to===null||b[i].to===undefined||v<=b[i].to) return i; } return b.length-1; }
+function rbLevel(m,v){ return m.bands[rbPick(m.bands,v)]; }
+function rbValueText(m,v){
+  if(m.type==="bar") return `${v}/${rbRange(m).max}`;
+  if(m.type==="pips"){ const r=rbRange(m); return `${v-r.min} of ${r.max-r.min}`; }
+  const d=[0,1,2].includes(m.decimals)?m.decimals:0; return `${m.unit||""}${v.toFixed(d)}`;
+}
+
+/* ---- Story clock ---- */
+function rbClockStart(m){
+  const mt=/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/.exec(m.start||"");
+  let ms=NaN; if(mt) ms=Date.UTC(+mt[1],+mt[2]-1,+mt[3],+(mt[4]||9),+(mt[5]||0));
+  return Number.isFinite(ms)?ms:Date.UTC(2026,0,1,9,0);
+}
+function rbClockInfo(m,t){
+  const base=rbClockStart(m), d=new Date(base+t*60000), b=new Date(base);
+  const day=Math.round((Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())-Date.UTC(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate()))/86400000)+1;
+  const hh=d.getUTCHours(), mi=d.getUTCMinutes();
+  return {day,hh,mi,pos:((hh*60+mi-360)%1440+1440)%1440,wd:d.getUTCDay(),month:d.getUTCMonth()+1,dom:d.getUTCDate(),year:d.getUTCFullYear()};
+}
+function rbClockView(m,st){
+  const ck=st.clock||{t:0}, i=rbClockInfo(m,ck.t), p=n=>String(n).padStart(2,"0");
+  const time=`${p(i.hh)}:${p(i.mi)}`, date=`${RB_DAYS[i.wd].slice(0,3)} ${i.dom} ${RB_MONTHS[i.month-1].slice(0,3)} ${i.year}`;
+  const tod=(m.todBands||[]).length?m.todBands[rbPick(m.todBands,i.pos)]:null, dayb=(m.dayBands||[]).length?m.dayBands[rbPick(m.dayBands,i.day)]:null;
+  const dt=m.mode!=="date";
+  return {i,time,date,tod,dayb,dt,long:`${RB_DAYS[i.wd]} ${i.dom} ${RB_MONTHS[i.month-1]} ${i.year}${dt?`, ${time}`:""}`};
+}
+function rbClockDims(m){ return Array.isArray(m.ruleDims)?m.ruleDims:[(m.todBands||[]).length?"tod":null,(m.dayBands||[]).length?"day":null].filter(Boolean); }
+
+/* ---- Rule evaluation helpers ---- */
+function rbKeyHit(word,text){ return loreKeyRegex(word).test(loreNorm(text)); }
+function rbCount(st,m,id){ const o=st.coll[m.id]; return (o&&o[id])||0; }
+function rbCond(c,st){
+  const m=rbById(c.m); if(!m) return false;
+  const x=c.v;
+  switch(m.type){
+    case "bar": case "pips": case "number": case "dice": {
+      if(!(c.m in st.values)) return false; const v=st.values[c.m];
+      switch(c.op){ case ">=": case "≥": return v>=x; case "<=": case "≤": return v<=x; case ">": return v>x; case "<": return v<x; case "=": return v===x; }
+      return false;
+    }
+    case "clock": {
+      if(!st.clock) return false; const i=rbClockInfo(m,st.clock.t);
+      switch(c.op){
+        case "tod": return (m.todBands||[]).length>0 && rbPick(m.todBands,i.pos)===x;
+        case "day>=": case "day≥": return i.day>=x; case "day<=": case "day≤": return i.day<=x; case "day=": return i.day===x;
+        case "weekday": return (c.days||[]).includes(i.wd);
+        case "date": return i.month===c.month&&i.dom===c.day&&(c.year===undefined||i.year===c.year);
+      }
+      return false;
+    }
+    case "select": return c.op==="is"?st.sel[c.m]===c.item:c.op==="is_not"?st.sel[c.m]!==c.item:false;
+    case "collection": {
+      switch(c.op){
+        case "has>=": return rbCount(st,m,c.item)>=x; case "has<=": return rbCount(st,m,c.item)<=x;
+        case "holds>=": case "holds<=": { const n=m.items.filter(it=>rbCount(st,m,it.id)>0).length; return c.op==="holds>="?n>=x:n<=x; }
+      }
+      return false;
+    }
+    case "journal": {
+      const arr=(st.jrn[c.m]||[]).filter(e=>e.i===c.item); if(!arr.length) return false;
+      const last=arr[arr.length-1]; let el;
+      if(c.since==="days"){ const ck=rbClockMeter(); if(!ck||!st.clock||last.t===null) return false; el=rbClockInfo(ck,st.clock.t).day-rbClockInfo(ck,last.t).day; }
+      else el=st.turn-last.turn;
+      return c.op==="gte"?el>=x:c.op==="lte"?el<=x:false;
+    }
+  }
+  return false;
+}
+function rbCondsOk(f,st){ const list=f.when||[]; return f.match==="any"?list.some(c=>rbCond(c,st)):list.every(c=>rbCond(c,st)); }
+function rbJrnRule(m,r,st){
+  const arr=st.jrn[m.id]||[], n=r.item?arr.filter(e=>e.i===r.item).length:arr.length;
+  switch(r.op){ case "recorded": return n>0; case "not_recorded": return n===0; case "recorded_at_least": return n>=r.v; case "recorded_nothing": return arr.length===0; }
+  return false;
+}
+/* Combined, Collection and Journal rules that currently match: [{id, instr, caption}] */
+function rbActiveRules(){
+  const rb=S.rulebook&&S.rulebook.rb, st=S.rbState, out=[]; if(!rb||!st) return out;
+  for(const c of (rb.combined_rules||[])) if(c.conds.every(x=>rbCond(x,st))) out.push(c);
+  for(const m of rb.meters){
+    if(m.type==="collection") for(const r of (m.rules||[])) if(rbCond({m:m.id,op:r.op,v:r.v,item:r.item},st)) out.push(r);
+    if(m.type==="journal") for(const r of (m.journal_rules||[])) if(rbJrnRule(m,r,st)) out.push(r);
+  }
+  return out;
+}
+/* Fire gate shared by triggers and dice: cross / every_turn / every_n_turns / once */
+function rbGate(st,key,holds,fire,every){
+  const g=st.gate[key]||(st.gate[key]={on:false,last:-1,done:false});
+  const was=g.on; g.on=!!holds; let go=false;
+  if(holds){
+    if(fire==="every_turn") go=true;
+    else if(fire==="every_n_turns") go=g.last<0||st.turn-g.last>=(every||1);
+    else if(fire==="once") go=!g.done;
+    else go=!was;
+  }
+  if(go){ g.last=st.turn; g.done=true; }
+  return go;
+}
+/* Apply one rule/keyword change to a value. `m` on a change reads another meter as a multiplier. */
+function rbChange(cur,ch,vals){
+  if(ch.rand){ const lo=Math.min(ch.rand.rmin,ch.rand.rmax), hi=Math.max(ch.rand.rmin,ch.rand.rmax); return cur+lo+Math.floor(Math.random()*(hi-lo+1)); }
+  if("min" in ch||"max" in ch){ let v=cur; if(Number.isFinite(ch.max)) v=Math.min(v,ch.max); if(Number.isFinite(ch.min)) v=Math.max(v,ch.min); return v; }
+  const k=("d" in ch)?"d":("set" in ch)?"set":("x" in ch)?"x":"div";
+  let amt=ch[k]; if(ch.m!==undefined) amt*=(typeof vals[ch.m]==="number"?vals[ch.m]:0);
+  if(k==="d") return cur+amt; if(k==="set") return amt; if(k==="x") return cur*amt;
+  return amt===0?cur:cur/amt;
+}
+function rbReads(m){
+  if(m.type==="journal") return m.reads==="user"?"the player's message":m.reads==="bot"?"the previous story passage":"both the player's message and the previous passage";
+  return m.tracks==="user"?"the player's message":m.tracks==="character"?"the characters' behaviour in the previous passage":"both the player's message and the previous passage";
+}
+function rbResolveItem(m,a){
+  if(typeof a!=="string") return null; const s=a.trim().toLowerCase(); if(!s) return null;
+  return m.items.find(i=>i.id===s)||m.items.find(i=>i.label.toLowerCase()===s)||null;
+}
+function rbRecord(st,m,it,stats){
+  const arr=st.jrn[m.id]||(st.jrn[m.id]=[]);
+  arr.push({i:it.id,turn:st.turn,t:st.clock?st.clock.t:null}); if(arr.length>300) arr.splice(0,arr.length-300);
+  stats.fired.push(`${m.label}: recorded "${it.label}"`);
+}
+function rbCanRecord(st,m,it){ const arr=st.jrn[m.id]||[]; if(arr.some(e=>e.i===it.id&&e.turn===st.turn)) return false; return it.repeat===true||!arr.some(e=>e.i===it.id); }
+
+/* ---- The turn pipeline: [dice: before reply] -> keywords -> AI check -> decay & clock (if unchanged) -> [dice: after meters] -> triggers ----
+   opts.cont: the player pressed Continue (no message to read; the last reply is what the referee judges). */
+async function runRulebookTurn(action,opts){
+  if(!S.rulebook||!S.rulebook.rb) return;
+  if(S.rbPending) S.rbState=JSON.parse(S.rbPending.before); // a failed/retried turn must not apply twice
+  S.rbPending={before:JSON.stringify(S.rbState)};
+  const rb=S.rulebook.rb, st=S.rbState, prevDelta=st.delta||{};
+  st.turn=(st.turn||0)+1; st.delta={};
+  const ms=rb.meters, nums=ms.filter(rbIsNum), t0=Date.now(), cont=!!(opts&&opts.cont), text=cont?"":String(action||"");
+  const start={}; for(const m of nums) start[m.id]=st.values[m.id];
+  const fired=new Set(); const stats={turn:st.turn,asked:0,fired:[],failed:false,ms:0,cont};
+  const lastNarr=[...S.history].reverse().find(x=>x.role==="assistant");
+  const prev=lastNarr?String(lastNarr.content).slice(-1800):"";
+  const clk=ms.find(m=>m.type==="clock")||null, dice=ms.filter(m=>m.type==="dice"), jms=ms.filter(m=>m.type==="journal"), cms=ms.filter(m=>m.type==="collection");
+
+  // 0. a roll that has run out of replies is no longer current
+  for(const m of dice){ const d=st.dice[m.id]; if(d&&Number.isFinite(m.lasts)&&st.turn-d.turn>=m.lasts){ delete st.dice[m.id]; delete st.values[m.id]; } }
+  // dice: rolls when their conditions are met (no conditions = every message)
+  const aiDice={};
+  const diceTurn=(timing,rises)=>{
+    for(const m of dice){
+      if((m.timing||"before_reply")!==timing) continue;
+      const rw=m.rollWhen||{}, res=[];
+      if(rw.every_turns) res.push(st.turn%rw.every_turns===0);
+      if((rw.keywords||[]).length) res.push(!!text&&rw.keywords.some(w=>{ try{ return rbKeyHit(w,text); }catch(e){ return false; } }));
+      if((rw.ai_conditions||[]).length) res.push(!!aiDice[m.id]);
+      if(rw.meter_conditions){ const mc=rw.meter_conditions, l=mc.conditions.map(c=>rbCond({m:c.meter_id,op:c.op,v:c.value},st)); res.push(rbGate(st,"dice:"+m.id,mc.match==="any"?l.some(Boolean):l.every(Boolean),mc.fire,mc.every_turns)); }
+      if((rw.meter_rises||[]).length) res.push(rw.meter_rises.some(id=>(rises[id]||0)>0));
+      const want=!res.length||(rw.match==="all"?res.every(Boolean):res.some(Boolean));
+      if(!want) continue;
+      if(Number.isFinite(rw.cooldown)&&st.rolled[m.id]!==undefined&&st.turn-st.rolled[m.id]<rw.cooldown) continue;
+      const r=1+Math.floor(Math.random()*m.sides);
+      st.dice[m.id]={roll:r,turn:st.turn}; st.values[m.id]=r; st.rolled[m.id]=st.turn; stats.fired.push(`${m.label}: rolled ${r}`);
+    }
+  };
+  diceTurn("before_reply",prevDelta);
+
+  // 1. keyword rules (player's last message only) and journal cues
+  for(const m of nums) for(const kw of (m.keywords||[])){
+    let hit=false; try{ hit=!!text&&kw.words.some(w=>rbKeyHit(w,text)); }catch(e){}
+    if(!hit) continue;
+    st.values[m.id]=rbFix(m,("set" in kw)?kw.set:st.values[m.id]+kw.delta);
+    fired.add(m.id); stats.fired.push(`${m.label}: keyword "${kw.words[0]}"`);
+  }
+  const jText=m=>m.reads==="user"?text:m.reads==="bot"?prev:text+"\n"+prev;
+  for(const m of jms) for(const it of m.items){
+    if(!(it.cues||[]).length||!rbCanRecord(st,m,it)) continue;
+    let hit=false; try{ hit=it.cues.some(w=>rbKeyHit(w,jText(m))); }catch(e){}
+    if(hit) rbRecord(st,m,it,stats);
+  }
+
+  // 2. AI check: one batched call with a question per applicable rule
+  const qs=[];
+  for(const m of nums){
+    const ai=m.ai; if(!ai||ai.on===false) continue;
+    if(ai.mode==="extract"){ qs.push({k:"x",m}); continue; }
+    for(const r of (ai.rules||[])){
+      const key=m.id+":"+r.id, last=st.lastFired[key];
+      if(typeof r.cooldown==="number" && last!==undefined){ if(r.cooldown<0) continue; if(st.turn-last<=r.cooldown) continue; }
+      if(r.if && !rbCondsOk(r.if,st)) continue;
+      qs.push({k:"r",m,r,key});
+    }
+  }
+  for(const m of ms.filter(x=>x.type==="select")) qs.push({k:"s",m});
+  if(clk&&clk.skips===true){ qs.push({k:"cd",m:clk}); if(clk.mode!=="date") qs.push({k:"cm",m:clk}); }
+  for(const m of dice){
+    const rw=m.rollWhen||{}; if(!(rw.ai_conditions||[]).length) continue;
+    if(Number.isFinite(rw.cooldown)&&st.rolled[m.id]!==undefined&&st.turn-st.rolled[m.id]<rw.cooldown) continue;
+    for(const c of rw.ai_conditions) qs.push({k:"da",m,c});
+  }
+  if(cms.length) qs.push({k:"c"});
+  const jPend=jms.filter(m=>m.items.some(it=>rbCanRecord(st,m,it)));
+  if(jPend.length) qs.push({k:"j"});
+  stats.asked=qs.length;
+  let skipDays=0, skipMin=0;
+  if(qs.length){
+    let ans=null;
+    try{
+      const qline=(q,i)=>{
+        const n=`q${i+1}`;
+        switch(q.k){
+          case "r": return `${n} [${q.m.label}; judge ${rbReads(q.m)}] ${rbSub(q.r.when)}`;
+          case "x": return `${n} [${q.m.label}; NUMBER; judge ${rbReads(q.m)}] ${rbSub(q.m.ai.extractHint||`The amount ${q.m.label} changes by`)}`;
+          case "s": return `${n} [${q.m.label}; PICK ONE; judge ${rbReads(q.m)}] Which one is current right now? Currently: "${st.sel[q.m.id]}". ${rbSub(q.m.detectHint||"")} Answer with exactly one id: ${q.m.items.map(it=>`"${it.id}" (${it.label})`).join(", ")}`;
+          case "cd": return `${n} [Story clock; NUMBER; judge both the player's message and the previous passage] How many WHOLE DAYS does the story skip forward (a week later = 7, the next day = 1)? 0 if time just flows on or the skip is under a day.`;
+          case "cm": return `${n} [Story clock; NUMBER; judge both the player's message and the previous passage] How many MINUTES does the story skip forward beyond normal flow (an hour later = 60; "the next morning" = the minutes until that morning)? 0 if none or if you already counted whole days.`;
+          case "da": return `${n} [${q.m.label}; judge both the player's message and the previous passage] ${rbSub(q.c.condition)}`;
+          case "c": return `${n} [Inventories; NUMBER per item] How many of each item did the story give or take in the latest exchange (positive = gained, negative = spent or lost; held items: 1 = obtained, -1 = lost)? Answer an object {"<meter id>":{"<item id>":number}} listing ONLY items that changed.\n`+cms.map(m=>`  Meter "${m.id}" (${m.label}; judge ${rbReads(m)}). ${rbSub(m.detectHint||"")} Items: ${m.items.map(it=>`"${it.id}" (${it.label}; ${it.kind==="counted"?"counted, have "+rbCount(st,m,it.id):"held, "+(rbCount(st,m,it.id)?"have it":"don't have it")})`).join(", ")}`).join("\n");
+          case "j": return `${n} [Journals] Which of these events clearly happened (each judged on the text named)? Answer an object {"<journal id>":["<event id>",...]} with an empty list when none.\n`+jPend.map(m=>`  Journal "${m.id}" (${m.label}; judge ${rbReads(m)}). ${rbSub(m.detectHint||"")} Events: ${m.items.filter(it=>rbCanRecord(st,m,it)).map(it=>`"${it.id}" (${rbSub(it.hint||it.label)})`).join("; ")}`).join("\n");
+        }
+        return "";
+      };
+      const lines=qs.map(qline);
+      const prompt=`You are the referee of an interactive story. Decide what happened in the latest exchange.\n\nPrevious story passage:\n"""${prev||"(none yet)"}"""\n\nPlayer's latest message:\n"""${cont?"(none: the player asked the story to continue by itself)":text}"""\n\nQuestions. Each says which text to judge. Answer true only if it clearly happened, not if it is merely implied or hoped for. A NUMBER question asks for a signed amount; answer 0 if nothing happened. A PICK ONE question wants one id as a string.\n${lines.join("\n")}\n\nReturn ONLY raw JSON: {"a":{"q1":true|false|number|"id"|{...},...}} with one entry per question.`;
+      const raw=await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",Math.min(1100,100+qs.length*14+((cms.length||jPend.length)?250:0)));
+      const p=parseJSON(raw,null); ans=p&&p.a&&typeof p.a==="object"?p.a:null;
+    }catch(e){ ans=null; }
+    if(!ans) stats.failed=true;
+    else {
+      const pre=Object.assign({},st.values);
+      qs.forEach((q,i)=>{ // non-numeric answers
+        const a=ans[`q${i+1}`];
+        if(q.k==="s"){ const it=rbResolveItem(q.m,a); if(it&&st.sel[q.m.id]!==it.id){ st.sel[q.m.id]=it.id; stats.fired.push(`${q.m.label}: now "${it.label}"`); } }
+        else if(q.k==="cd"){ const n=Math.trunc(Number(a)); if(Number.isFinite(n)&&n>0) skipDays=Math.min(n,3650); }
+        else if(q.k==="cm"){ const n=Math.trunc(Number(a)); if(Number.isFinite(n)&&n>0) skipMin=Math.min(n,525600); }
+        else if(q.k==="da"){ if(a===true) aiDice[q.m.id]=true; }
+        else if(q.k==="c"&&a&&typeof a==="object"&&!Array.isArray(a)){
+          for(const m of cms){
+            const o=Object.prototype.hasOwnProperty.call(a,m.id)?a[m.id]:null; if(!o||typeof o!=="object") continue;
+            for(const it of m.items){
+              const x=Object.prototype.hasOwnProperty.call(o,it.id)?Math.trunc(Number(o[it.id])):0; if(!Number.isFinite(x)||x===0) continue;
+              const cur=rbCount(st,m,it.id);
+              const nv=it.kind==="counted"?Math.max(0,Math.min(it.max||9999,cur+Math.max(-9999,Math.min(9999,x)))):(x>0?1:0);
+              if(nv!==cur){ st.coll[m.id][it.id]=nv; stats.fired.push(`${m.label}: ${it.label} ${nv>cur?"+":""}${nv-cur}`); }
+            }
+          }
+        }
+        else if(q.k==="j"&&a&&typeof a==="object"&&!Array.isArray(a)){
+          for(const m of jPend){
+            const l=Object.prototype.hasOwnProperty.call(a,m.id)?a[m.id]:null; if(!Array.isArray(l)) continue;
+            for(const it of m.items) if(l.includes(it.id)&&rbCanRecord(st,m,it)) rbRecord(st,m,it,stats);
+          }
+        }
+      });
+      for(const m of nums){
+        const mine=qs.map((q,i)=>({q,a:ans[`q${i+1}`]})).filter(x=>x.q.m===m&&(x.q.k==="r"||x.q.k==="x"));
+        if(!mine.length) continue;
+        const ai=m.ai, base=st.values[m.id]; let v=base, any=false;
+        const ex=mine.find(x=>x.q.k==="x");
+        if(ex){
+          const amt=Number(ex.a);
+          if(Number.isFinite(amt) && amt!==0 && !(amt<0 && m.type==="number" && !m.spend)){ v=base+amt; any=true; stats.fired.push(`${m.label}: ${amt>0?"+":""}${amt} (extracted)`); }
+        } else {
+          let fr=mine.filter(x=>x.a===true).map(x=>x.q);
+          if(ai.negOverrides){ const dl=fr.map(q=>rbChange(base,q.r,pre)-base); if(dl.some(x=>x<0)&&dl.some(x=>x>0)) fr=fr.filter((q,i)=>dl[i]<=0); }
+          for(const q of fr){ v=rbChange(v,q.r,pre); st.lastFired[q.key]=st.turn; stats.fired.push(`${m.label}: ${q.r.id}`); any=true; }
+        }
+        if(any){
+          let net=v-base; if(Number.isFinite(ai.lo)) net=Math.max(net,ai.lo); if(Number.isFinite(ai.hi)) net=Math.min(net,ai.hi);
+          st.values[m.id]=rbFix(m,base+net); fired.add(m.id);
+        }
+      }
+    }
+  }
+
+  // 3. decay (only for meters nothing changed this turn; counts quiet turns since the last change), per-message steps, story clock
+  for(const m of nums){
+    if((m.type==="bar"||m.type==="pips") && Number.isFinite(m.decay) && m.decay_every>=1){
+      if(fired.has(m.id)) st.idle[m.id]=0;
+      else { st.idle[m.id]=(st.idle[m.id]||0)+1; if(st.idle[m.id]>=m.decay_every){ st.values[m.id]=rbFix(m,st.values[m.id]+m.decay); st.idle[m.id]=0; } }
+    }
+    if(m.type==="number" && Number.isFinite(m.perMsg) && m.perMsg!==0) st.values[m.id]=rbFix(m,st.values[m.id]+m.perMsg);
+  }
+  if(clk&&st.clock){
+    const before=st.clock.t;
+    if(clk.mode==="date"){ if(clk.stepEvery>0){ st.clock.ctr=(st.clock.ctr||0)+1; if(st.clock.ctr>=clk.stepEvery){ st.clock.t+=1440; st.clock.ctr=0; } } }
+    else st.clock.t+=(Number.isFinite(clk.stepMin)?clk.stepMin:0);
+    if(skipDays>0){ st.clock.t+=skipDays*1440; st.clock.ctr=0; stats.fired.push(`${clk.label}: skipped ${skipDays} day${skipDays===1?"":"s"}`); }
+    if(skipMin>0){ st.clock.t+=skipMin; stats.fired.push(`${clk.label}: skipped ${skipMin} min`); }
+    if(st.clock.t!==before&&!stats.fired.some(x=>x.startsWith(clk.label+":"))) stats.clock=true;
+  }
+
+  // 4. dice that roll after the meters have settled
+  const risen={}; for(const m of nums){ const d=st.values[m.id]-start[m.id]; if(d) risen[m.id]=d; }
+  diceTurn("after_meters",risen);
+
+  // 5. meter triggers (last, never chained: they read a snapshot and only move their own meter)
+  const snap=Object.assign({},st.values);
+  for(const g of (rb.meter_triggers||[])){
+    if(g.on===false) continue;
+    const om=ms.find(x=>x.id===g.m); if(!om||!rbIsNum(om)) continue;
+    for(const tr of g.triggers){
+      const holds=rbCondsOk(tr,st), go=rbGate(st,`t:${g.m}:${tr.id}`,holds,tr.fire||"cross",tr.every_turns);
+      if(!go) continue;
+      st.values[g.m]=rbFix(om,rbChange(st.values[g.m],tr.do,snap)); stats.fired.push(`${om.label}: trigger ${tr.id}`);
+    }
+  }
+
+  for(const m of nums){ const d=Math.round((st.values[m.id]-start[m.id])*100)/100; if(d!==0) st.delta[m.id]=d; }
+  stats.ms=Date.now()-t0; stats.changes=nums.filter(m=>st.delta[m.id]).map(m=>`${m.label} ${st.delta[m.id]>0?"+":""}${st.delta[m.id]}`);
+  S.lastRbStats=stats;
+  persistSession(); updateStatusUI();
+}
+
+/* ---- What the narrator is told ---- */
+function rbJournalNewest(m,st,n){
+  const seen=new Set(), out=[], arr=st.jrn[m.id]||[];
+  for(let i=arr.length-1;i>=0&&out.length<n;i--){ const it=m.items.find(x=>x.id===arr[i].i); if(it&&!seen.has(it.id)){ seen.add(it.id); out.push(it); } }
+  return out;
+}
+function rulebookContextString(){
+  if(!S.rulebook||!S.rbState) return "";
+  const st=S.rbState, out=[];
+  for(const m of rbMeters()){
+    const bits=[]; let tag="", pri=false;
+    if(rbIsNum(m)){
+      const v=st.values[m.id]; if(typeof v!=="number") continue;
+      const lv=rbLevel(m,v); tag=lv.label;
+      if(lv.instr){ bits.push(rbSub(lv.instr)); if(lv.override===true) pri=true; }
+      if(m.tellModel===true) bits.push(`Exact value — ${m.label}: ${rbValueText(m,v)}.`);
+    } else if(m.type==="clock"){
+      if(!st.clock) continue; const cv=rbClockView(m,st), dims=rbClockDims(m);
+      const labs=[]; if(cv.tod&&cv.dt) labs.push(cv.tod.label); if(cv.dayb&&dims.includes("day")) labs.push(cv.dayb.label); tag=labs.join(", ");
+      if(dims.includes("tod")&&cv.tod&&cv.tod.instr){ bits.push(rbSub(cv.tod.instr)); if(cv.tod.override===true) pri=true; }
+      if(dims.includes("day")&&cv.dayb&&cv.dayb.instr){ bits.push(rbSub(cv.dayb.instr)); if(cv.dayb.override===true) pri=true; }
+      if(m.tellModel===true) bits.push(`It is ${cv.long}; story day ${cv.i.day}.`);
+    } else if(m.type==="dice"){
+      const d=st.dice[m.id]; if(!d) continue;
+      const lv=rbLevel(m,d.roll); tag=lv.label;
+      if(lv.instr){ bits.push(rbSub(lv.instr)); if(lv.override===true) pri=true; }
+      if(m.tellModel===true) bits.push(`Latest roll: ${d.roll} on a d${m.sides}.`);
+    } else if(m.type==="select"){
+      const it=m.items.find(i=>i.id===st.sel[m.id]); if(!it) continue; tag=it.label;
+      if(it.instruction) bits.push(rbSub(it.instruction));
+      if(m.tellModel===true) bits.push(`Current: ${it.label}.`);
+    } else if(m.type==="collection"){
+      const held=m.items.filter(it=>rbCount(st,m,it.id)>0);
+      for(const it of held) if(it.instruction) bits.push(rbSub(it.instruction));
+      if(m.tellModel===true) bits.push(`${rbSub("{{user}}")} has: ${held.length?held.map(it=>it.kind==="counted"?`${it.label} ×${rbCount(st,m,it.id)}`:it.label).join(", "):"nothing"}.`);
+    } else if(m.type==="journal"){
+      if(m.tellModel!==false){ const l=rbJournalNewest(m,st,10); if(l.length) bits.push(`Already happened, newest first: ${l.map(it=>rbSub(it.label)).join("; ")}.`); }
+    }
+    if(bits.length) out.push(`- ${m.label}${tag?` (${tag})`:""}: ${pri?"PRIORITY \u2014 ":""}${bits.join(" ")}`);
+  }
+  for(const r of rbActiveRules()) if(r.instr) out.push(`- Situation: ${rbSub(r.instr)}`);
+  return out.join("\n");
+}
+
+/* ---- Visuals ---- */
+const RB_COLORS={amber:["#ae731d","#f5b83d"],blue:["#2f6fd6","#6aa3ff"],contrast:["#222222","#f2f2f2"],cream:["#978251","#efe3c2"],crimson:["#b01234","#f0506e"],cyan:["#0e8aa3","#46d3ea"],emerald:["#0f8a5f","#34d399"],gray:["#6b7280","#a3acb9"],green:["#3a8f3a","#6fd16f"],indigo:["#4f46c8","#8b85ff"],lime:["#618b09","#b4e33d"],magenta:["#b3239a","#f06ad8"],mint:["#299274","#8de6c6"],ochre:["#a8741a","#e0aa45"],olive:["#6b7d1f","#a9bd4a"],orange:["#ce6119","#ff9a4d"],peach:["#bc6e53","#ffc2a6"],petrol:["#1d6a78","#4fb1c2"],pink:["#d1457f","#ff8fbd"],powder:["#5a88ac","#b8d7ee"],purple:["#7b3fc4","#b98cff"],red:["#c62828","#ff6b6b"],royal:["#2a46b8","#6d86ff"],rust:["#a8431f","#e0764a"],salmon:["#ce5f46","#ff9f8a"],sky:["#2888c7","#7cc8ff"],teal:["#12877f","#3fd0c4"],yellow:["#917c00","#ffe14d"]};
+function rbApplyColorVars(){ const root=document.documentElement; for(const k in RB_COLORS) root.style.setProperty("--rbc-"+k,RB_COLORS[k][S.dark?1:0]); }
+const RB_ICONS={
+  heart:'<path d="M12 20.5s-7.5-4.6-9.4-9.3A5.1 5.1 0 0 1 12 6.4a5.1 5.1 0 0 1 9.4 4.8c-1.9 4.7-9.4 9.3-9.4 9.3z"/>',
+  shield:'<path d="M12 3l8 3v6c0 4.6-3.3 8.2-8 9-4.7-.8-8-4.4-8-9V6l8-3z"/>',
+  bolt:'<path d="M13 2.5L4.5 14H11l-1 7.5L19.5 10H13l0-7.5z"/>',
+  star:'<path d="M12 2.8l2.8 5.9 6.4.9-4.7 4.5 1.2 6.4L12 17.4l-5.7 3.1 1.2-6.4-4.7-4.5 6.4-.9L12 2.8z"/>',
+  flame:'<path d="M12 2.5c.6 3.8-3.3 5.3-3.3 9.2a3.3 3.3 0 0 0 6.6 0c0-1.2-.5-2.2-1-3 2.2 1 4.2 3.4 4.2 6.3a6.5 6.5 0 0 1-13 0c0-5 4.1-7.1 6.5-12.5z"/>',
+  coin:'<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5h4a1.6 1.6 0 0 1 0 3.2h-3a1.6 1.6 0 0 0 0 3.2H15" fill="none"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2" fill="none"/>',
+  map:'<path d="M9 4L3 6.2v14L9 18l6 2.2 6-2.2v-14L15 6.2 9 4z"/><path d="M9 4v14M15 6.2v14" fill="none"/>',
+  backpack:'<path d="M8.5 7a3.5 3.5 0 0 1 7 0"/><rect x="5.5" y="7" width="13" height="14" rx="3"/><path d="M9 14h6" fill="none"/>',
+  dice:'<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
+  alert:'<path d="M12 3.5l9.5 16.5h-19L12 3.5z"/><path d="M12 10v4.5M12 17.4v.2" fill="none"/>',
+  warning:'<path d="M12 3.5l9.5 16.5h-19L12 3.5z"/><path d="M12 10v4.5M12 17.4v.2" fill="none"/>',
+  bag:'<path d="M5 8h14l1 13H4L5 8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8" fill="none"/>',
+  heartbreak:'<path d="M12 20.5s-7.5-4.6-9.4-9.3A5.1 5.1 0 0 1 12 6.4a5.1 5.1 0 0 1 9.4 4.8c-1.9 4.7-9.4 9.3-9.4 9.3z"/><path d="M12 6.4l-1.8 3.6 3 2-1.6 4.5" fill="none"/>',
+  smile:'<circle cx="12" cy="12" r="9"/><path d="M8 14.2a5 5 0 0 0 8 0" fill="none"/><circle cx="9" cy="9.5" r=".9" fill="currentColor"/><circle cx="15" cy="9.5" r=".9" fill="currentColor"/>',
+  frown:'<circle cx="12" cy="12" r="9"/><path d="M8 16.5a5 5 0 0 1 8 0" fill="none"/><circle cx="9" cy="9.5" r=".9" fill="currentColor"/><circle cx="15" cy="9.5" r=".9" fill="currentColor"/>',
+  angry:'<circle cx="12" cy="12" r="9"/><path d="M7.5 8l3 1.5M16.5 8l-3 1.5M8.5 16.5a4.5 4.5 0 0 1 7 0" fill="none"/><circle cx="9.3" cy="11.5" r=".9" fill="currentColor"/><circle cx="14.7" cy="11.5" r=".9" fill="currentColor"/>',
+  mind:'<path d="M12 4.5A3 3 0 0 0 6.5 6 3.2 3.2 0 0 0 4 9.2c0 1 .4 1.8 1 2.4A3.3 3.3 0 0 0 6.5 17.5 3 3 0 0 0 12 19z"/><path d="M12 4.5A3 3 0 0 1 17.5 6 3.2 3.2 0 0 1 20 9.2c0 1-.4 1.8-1 2.4a3.3 3.3 0 0 1-1.5 5.9A3 3 0 0 1 12 19z"/><path d="M12 4.5V19" fill="none"/>',
+  energy:'<circle cx="12" cy="12" r="9"/><path d="M13 6.5L8.5 13h3l-.5 4.5 4.5-6.5h-3l.5-4.5z"/>',
+  spark:'<path d="M12 3c.8 5 2.2 6.4 7 9-4.8 2.6-6.2 4-7 9-.8-5-2.2-6.4-7-9 4.8-2.6 6.2-4 7-9z"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  person:'<circle cx="12" cy="8" r="3.6"/><path d="M5 20.5c0-4 3-6.5 7-6.5s7 2.5 7 6.5z"/>',
+  group:'<circle cx="9" cy="8" r="3"/><path d="M3 19.5c0-3.6 2.7-5.5 6-5.5s6 1.9 6 5.5z"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14c2.8 0 4.5 1.5 4.5 4.5" fill="none"/>',
+  crowd:'<circle cx="12" cy="8" r="3"/><path d="M6.5 19.5c0-3.4 2.4-5.5 5.5-5.5s5.5 2.1 5.5 5.5z"/><circle cx="5" cy="10" r="2"/><circle cx="19" cy="10" r="2"/><path d="M2 18c0-2.2 1.4-3.6 3-3.6M22 18c0-2.2-1.4-3.6-3-3.6" fill="none"/>',
+  deal:'<path d="M6 3h9l4 4v14H6z"/><path d="M14.5 3v4.5H19" fill="none"/><path d="M9 14l2.2 2.2L15.5 12" fill="none"/>',
+  bot:'<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V4.5" fill="none"/><circle cx="12" cy="3.8" r="1.2"/><circle cx="9.3" cy="13" r="1.1" fill="currentColor"/><circle cx="14.7" cy="13" r="1.1" fill="currentColor"/><path d="M9.5 16.5h5M3 12v3M21 12v3" fill="none"/>',
+  ghost:'<path d="M5 20.5V11a7 7 0 0 1 14 0v9.5l-2.3-2-2.4 2-2.3-2-2.3 2-2.4-2L5 20.5z"/><circle cx="9.5" cy="11" r="1.1" fill="currentColor"/><circle cx="14.5" cy="11" r="1.1" fill="currentColor"/>',
+  crown:'<path d="M3.5 18.5L2.5 7l5 4.5L12 5l4.5 6.5 5-4.5-1 11.5z"/>',
+  skull:'<path d="M12 3a8 8 0 0 0-8 8c0 2.8 1.4 4.6 3 5.6V20h10v-3.4c1.6-1 3-2.8 3-5.6a8 8 0 0 0-8-8z"/><circle cx="9" cy="11.5" r="1.8" fill="currentColor"/><circle cx="15" cy="11.5" r="1.8" fill="currentColor"/><path d="M10 20v-2.5M14 20v-2.5" fill="none"/>',
+  gem:'<path d="M6 4h12l4 5-10 12L2 9l4-5z"/><path d="M2 9h20M9 4L7.5 9 12 21l4.5-12L15 4" fill="none"/>',
+  key:'<circle cx="8" cy="15" r="4.5"/><path d="M11.3 11.7L20.5 2.5M16.5 6.5l3 3M14 9l2 2" fill="none"/>',
+  gift:'<rect x="4" y="10" width="16" height="10.5" rx="1"/><path d="M3 7h18v3H3z"/><path d="M12 7v13.5" fill="none"/><path d="M12 7C9 7 8 3.5 10 3.5S12 6 12 7zM12 7c3 0 4-3.5 2-3.5S12 6 12 7z" fill="none"/>',
+  ring:'<circle cx="12" cy="15" r="6"/><path d="M9.5 6.5L12 3l2.5 3.5L12 9z"/>',
+  potion:'<path d="M9.5 3h5M10 3v6L4.8 18a2 2 0 0 0 1.8 3h10.8a2 2 0 0 0 1.8-3L14 9V3"/><path d="M7.2 14.5h9.6" fill="none"/>',
+  pill:'<g transform="rotate(-45 12 12)"><rect x="3" y="8.3" width="18" height="7.4" rx="3.7"/><path d="M12 8.3v7.4" fill="none"/></g>',
+  scroll:'<path d="M7 3.5h11a2 2 0 0 1 2 2V7h-3v11.5a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 0 9 18.5V5.5A2 2 0 0 0 7 3.5z"/><path d="M12 9h2.5M12 12.5h2.5" fill="none"/>',
+  book:'<path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2V5z"/><path d="M4 20a2 2 0 0 1 2-2h13v3H6" fill="none"/><path d="M8.5 7h6" fill="none"/>',
+  letter:'<rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.5 7l8.5 6.5L20.5 7" fill="none"/>',
+  phone:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2" fill="none"/>',
+  camera:'<path d="M3 8h4l1.5-2.5h7L17 8h4v11H3z"/><circle cx="12" cy="13" r="3.5"/>',
+  coffee:'<path d="M5 9h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5V9z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5v2.5M12 3.5v2.5" fill="none"/>',
+  wine:'<path d="M7 3h10l-.6 6a4.4 4.4 0 0 1-8.8 0L7 3z"/><path d="M12 13.5V20M8.5 20.5h7" fill="none"/>',
+  food:'<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 4c1 1.2-1 2.2 0 3.6M12 4c1 1.2-1 2.2 0 3.6M16 4c1 1.2-1 2.2 0 3.6" fill="none"/>',
+  clothes:'<path d="M8.5 3.5L3 6.5l2.5 4 2-1V20h9V9.5l2 1 2.5-4-5.5-3a3.5 3.5 0 0 1-7 0z"/>',
+  wand:'<path d="M4 20L14.5 9.5" fill="none" stroke-width="2.6"/><path d="M17 3v4M15 5h4M20.5 10v3M19 11.5h3" fill="none"/>',
+  music:'<path d="M9 17.5V5l11-2v12.5" fill="none"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/>',
+  lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none"/>',
+  unlocked:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 7.6-1.7" fill="none"/>',
+  sword:'<path d="M20.5 3.5l-.7 5.3L9.6 19 5 14.4 15.2 4.2l5.3-.7z"/><path d="M7.5 12.5l4 4M5 14.5L3.5 20.5l6-1.5" fill="none"/>',
+  axe:'<path d="M4.5 20.5L15 10" fill="none" stroke-width="2.2"/><path d="M10.5 5.5l4-3 7 7-3 4z"/>',
+  bow:'<path d="M6 3c8 3 8 15 0 18" fill="none"/><path d="M6 3v18M6 12h15M17.5 8.5L21 12l-3.5 3.5" fill="none"/>',
+  hammer:'<rect x="4" y="3.5" width="13" height="6.5" rx="1.5"/><path d="M10.5 10v11" fill="none" stroke-width="2.4"/>',
+  bomb:'<circle cx="10.5" cy="14.5" r="7"/><path d="M15.5 9.5l3-3M19.5 2.5v2.5M21.5 4.5H19" fill="none"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
+  crosshair:'<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v6M12 15.5v6M2.5 12h6M15.5 12h6" fill="none"/>',
+  trophy:'<path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M9 18h6M8 21h8" fill="none"/>',
+  flag:'<path d="M5 21V3" fill="none"/><path d="M5 4h12l-2.5 4L17 12H5z"/>',
+  pin:'<path d="M12 21.5s-7-6-7-11.8a7 7 0 0 1 14 0c0 5.8-7 11.8-7 11.8z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  home:'<path d="M3 11l9-8 9 8" fill="none"/><path d="M5.5 9.5V21h13V9.5" fill="none"/><path d="M10 21v-6h4v6" fill="none"/>',
+  castle:'<path d="M4 21V5h3v3h2V5h6v3h2V5h3v16z"/><path d="M10 21v-4a2 2 0 0 1 4 0v4" fill="none"/>',
+  shop:'<path d="M3 9l1.5-5h15L21 9a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z"/><path d="M5 11.5V21h14v-9.5M10 21v-5h4v5" fill="none"/>',
+  door:'<rect x="6" y="3" width="12" height="18" rx="1.5"/><circle cx="15" cy="12.5" r=".9" fill="currentColor"/>',
+  compass:'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.5 3.2 3.5 14.8 0 18-3.5-3.2-3.5-14.8 0-18z" fill="none"/>',
+  anchor:'<circle cx="12" cy="5.5" r="2.5"/><path d="M12 8v13M8 11.5h8M4 14c0 4 3.5 7 8 7s8-3 8-7M2.5 15.5L4 14l1.5 1.5M18.5 15.5L20 14l1.5 1.5" fill="none"/>',
+  car:'<path d="M3 16v-4.5l2-5.5h14l2 5.5V16z"/><path d="M3 11.5h18" fill="none"/><circle cx="7.5" cy="17" r="1.8"/><circle cx="16.5" cy="17" r="1.8"/>',
+  plane:'<path d="M21 3L3 10.5l6.5 2.5 2.5 6.5L21 3z"/><path d="M9.5 13L21 3" fill="none"/>',
+  footprints:'<ellipse cx="8" cy="16" rx="2.6" ry="3.6"/><circle cx="8" cy="10" r="1.3"/><ellipse cx="16" cy="10.5" rx="2.6" ry="3.6"/><circle cx="16" cy="4.5" r="1.3"/>',
+  leaf:'<path d="M20 4C10 4 4 9 4 15c0 2 1 4 3 5 6 0 13-5 13-16z"/><path d="M4 21c3-6 7-9 11-11" fill="none"/>',
+  tree:'<path d="M12 3l6 8h-3l4 6H5l4-6H6l6-8z"/><path d="M12 17v4" fill="none"/>',
+  mountain:'<path d="M2 20l7-13 4 7 3-4 6 10H2z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" fill="none"/>',
+  moon:'<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/>',
+  cloud:'<path d="M7 18a4.5 4.5 0 0 1-.5-9A6 6 0 0 1 18 10a4 4 0 0 1-.5 8H7z"/>',
+  rain:'<path d="M7 14a4 4 0 0 1-.4-8A5.3 5.3 0 0 1 17 7.5 3.4 3.4 0 0 1 16.6 14H7z"/><path d="M8 17.5l-1 3M12 17.5l-1 3M16 17.5l-1 3" fill="none"/>',
+  snow:'<path d="M12 2.5v19M3.8 7.2l16.4 9.6M3.8 16.8l16.4-9.6" fill="none"/>',
+  wind:'<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h7" fill="none"/>',
+  drop:'<path d="M12 3s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10 12 3 12 3z"/>',
+  paw:'<path d="M8 17c0-3 2-5 4-5s4 2 4 5-2 3.5-4 3.5S8 20 8 17z"/><circle cx="6" cy="12" r="1.7"/><circle cx="9.5" cy="7.5" r="1.7"/><circle cx="14.5" cy="7.5" r="1.7"/><circle cx="18" cy="12" r="1.7"/>',
+  fish:'<path d="M3 12c3-5 8-6 12-3l4-3v12l-4-3c-4 3-9 2-12-3z"/><circle cx="8" cy="11.5" r=".9" fill="currentColor"/>',
+  bird:'<path d="M3.5 12.5c0-3.5 3-6 6.5-6 2 0 3.5 1 4.5 2.5l5 1.5-4.5 1.5c0 4-3 7-7 7-2.5 0-4.5-2.5-4.5-6.5z"/><circle cx="9.5" cy="10.5" r=".9" fill="currentColor"/>',
+  hourglass:'<path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" fill="none"/>',
+  calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4" fill="none"/>',
+  bell:'<path d="M6 17v-6a6 6 0 0 1 12 0v6l2 2H4l2-2z"/><path d="M10 21.5a2 2 0 0 0 4 0" fill="none"/>',
+  charge:'<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21.5 10.5v3M11 9.5l-2 2.5h3l-1 2.5" fill="none"/>',
+  gauge:'<path d="M4 18a9 9 0 1 1 16 0" fill="none"/><path d="M12 14l4-5" fill="none"/><circle cx="12" cy="14.5" r="1.2" fill="currentColor"/>',
+  search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21" fill="none"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.2" fill="none"/>',
+};
+function rbIcon(name,size,filled){
+  const body=RB_ICONS[name]||'<circle cx="12" cy="12" r="8"/>';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" fill="${filled?"currentColor":"none"}">${body}</svg>`;
+}
+function rbItemIcon(it){ return it&&it.icon&&it.revealed!==false&&RB_ICONS[it.icon]?`<span class="rb-ii">${rbIcon(it.icon,12,false)}</span>`:""; }
+function rbPct(m,v){ const r=rbRange(m); return r.max>r.min?Math.max(0,Math.min(100,(v-r.min)/(r.max-r.min)*100)):0; }
+function rbVisualHtml(m,v){
+  if(m.type==="bar"){
+    const r=rbRange(m), pct=rbPct(m,v), prev=S.rbShown&&S.rbShown[m.id]!==undefined?S.rbShown[m.id]:pct;
+    const ticks=m.bands.slice(0,-1).filter(b=>Number.isFinite(b.to)&&b.to>r.min&&b.to<r.max).map(b=>`<i class="rb-tick" style="left:${((b.to-r.min)/(r.max-r.min)*100).toFixed(2)}%"></i>`).join("");
+    return `<div class="rb-bar" role="meter" aria-valuemin="${r.min}" aria-valuemax="${r.max}" aria-valuenow="${v}" aria-label="${attr(m.label)}"><div class="rb-fill" data-id="${attr(m.id)}" data-to="${pct.toFixed(2)}" style="width:${prev.toFixed(2)}%"></div>${ticks}</div>`;
+  }
+  if(m.type==="pips"){
+    const r=rbRange(m), n=Math.max(1,r.max-r.min), on=v-r.min;
+    let h=""; for(let i=0;i<n;i++) h+=`<span class="rb-pip${i<on?" on":""}">${rbIcon(m.icon&&RB_ICONS[m.icon]?m.icon:"dot",16,i<on)}</span>`;
+    return `<div class="rb-pips" role="meter" aria-valuemin="0" aria-valuemax="${n}" aria-valuenow="${on}" aria-label="${attr(m.label)}">${h}</div>`;
+  }
+  const d=[0,1,2].includes(m.decimals)?m.decimals:0, lv=rbLevel(m,v);
+  const shown=m.display==="level"?(lv.revealed===false?"???":lv.label):`${m.unit||""}${v.toFixed(d)}`;
+  return `<div class="rb-num">${escapeHtml(shown)}</div>`;
+}
+function rbBandsHtml(list,cur){ return `<div class="rb-bands">${list.map((b,i)=>`<span class="rb-band${i===cur?" cur":""}">${rbItemIcon(b)}${escapeHtml(b.revealed===false?"???":b.label)}</span>`).join("")}</div>`; }
+function rbCardHtml(m,full,pop){
+  const st=S.rbState; if(!st) return "";
+  const color=RB_COLORS[m.color]?m.color:"gray";
+  const ed=m.userEditable===true&&m.type!=="dice"&&!pop;
+  const E=(kind,html,x)=>ed?`<span class="rb-edit" tabindex="0" role="button" data-rbedit="${attr(m.id)}" data-kind="${kind}"${x||""} title="Click to edit">${html}</span>`:html;
+  let val="", delta="", body="", level="", cap="", extra="";
+  const capOf=b=>(b&&b.caption&&b.revealed!==false)?b.caption:"";
+  const labOf=b=>b.revealed===false?"???":b.label;
+  if(rbIsNum(m)){
+    const v=st.values[m.id]; if(typeof v!=="number") return "";
+    const bi=rbPick(m.bands,v), lv=m.bands[bi], dl=st.delta[m.id];
+    delta=dl?`<span class="rb-delta" style="color:${dl>0?OUTCOME_META.success.color:OUTCOME_META.failure.color}">${dl>0?"+":"−"}${Math.abs(dl)}</span>`:"";
+    if(m.type!=="number") val=rbValueText(m,v);
+    body=rbVisualHtml(m,v);
+    if(ed&&m.type==="number") body=body.replace(/^(<div class="rb-num">)([\s\S]*)(<\/div>)$/,(a,b,c,d)=>b+E("num",c)+d);
+    if(!(m.type==="number"&&m.display==="level")) level=labOf(lv);
+    cap=capOf(lv); if(full) extra=rbBandsHtml(m.bands,bi);
+  } else if(m.type==="clock"){
+    if(!st.clock) return "";
+    const cv=rbClockView(m,st), dc=m.display==="daycount";
+    const eT=s=>E("time",escapeHtml(s)), eD=s=>E("date",escapeHtml(s));
+    let big, sub;
+    if(dc){ big=E("day",escapeHtml(`Day ${cv.i.day}`)); sub=cv.dt?eT(cv.time):""; } else if(cv.dt){ big=eT(cv.time); sub=eD(cv.date); } else { big=eD(cv.date); sub=""; }
+    body=`<div class="rb-num">${big}</div>${sub?`<div class="rb-level">${sub}</div>`:""}`;
+    const bs=[cv.dt?cv.tod:null,cv.dayb].filter(Boolean);
+    level=bs.map(labOf).join(" · "); cap=bs.map(capOf).find(Boolean)||"";
+    if(full){
+      const parts=[]; if(cv.dt&&(m.todBands||[]).length) parts.push(rbBandsHtml(m.todBands,rbPick(m.todBands,cv.i.pos))); if((m.dayBands||[]).length) parts.push(rbBandsHtml(m.dayBands,rbPick(m.dayBands,cv.i.day)));
+      extra=parts.join("");
+    }
+  } else if(m.type==="dice"){
+    const d=st.dice[m.id];
+    if(d){ const bi=rbPick(m.bands,d.roll), lv=m.bands[bi]; body=`<div class="rb-num">${d.roll}<span class="rb-of"> / d${m.sides}</span></div>`; level=labOf(lv); cap=capOf(lv); if(full) extra=rbBandsHtml(m.bands,bi); }
+    else { body=`<div class="rb-num">–</div>`; level="No roll yet"; if(full) extra=rbBandsHtml(m.bands,-1); }
+  } else if(m.type==="select"){
+    const bi=m.items.findIndex(i=>i.id===st.sel[m.id]), it=m.items[bi]; if(!it) return "";
+    body=`<div class="rb-num" style="font-size:16px">${rbItemIcon(it)}${escapeHtml(labOf(it))}</div>`; cap=capOf(it); if(ed) extra=`<div class="rb-bands">${m.items.map((o,i)=>`<button type="button" class="rb-band rb-edit${i===bi?" cur":""}" data-rbedit="${attr(m.id)}" data-kind="opt" data-item="${attr(o.id)}">${rbItemIcon(o)}${escapeHtml(labOf(o))}</button>`).join("")}</div>`; else if(full) extra=rbBandsHtml(m.items,bi);
+  } else if(m.type==="collection"){
+    const tag=it=>`<span class="rb-tag">${rbItemIcon(it)}${escapeHtml(labOf(it))}${it.kind==="counted"?` ×${rbCount(st,m,it.id)}`:""}</span>`;
+    const have=m.items.filter(it=>rbCount(st,m,it.id)>0), miss=m.items.filter(it=>rbCount(st,m,it.id)<=0);
+    body=`<div class="rb-tags">${have.length?have.map(tag).join(""):`<span class="rb-cap">Nothing</span>`}</div>`;
+    if(ed) body=`<div class="rb-tags">${m.items.map(it=>{ const n=rbCount(st,m,it.id); return `<button type="button" class="rb-tag rb-edit${n>0?"":" off"}" data-rbedit="${attr(m.id)}" data-kind="coll" data-item="${attr(it.id)}">${rbItemIcon(it)}${escapeHtml(labOf(it))}${it.kind==="counted"?` ×${n}`:""}</button>`; }).join("")}</div>`;
+    else if(full&&miss.length) extra=`<div class="rb-tags dim">${miss.map(it=>`<span class="rb-tag">${rbItemIcon(it)}${escapeHtml(labOf(it))}</span>`).join("")}</div>`;
+  } else if(m.type==="journal"){
+    const arr=(st.jrn[m.id]||[]).slice().reverse(), ck=rbClockMeter();
+    const row=e=>{ const it=m.items.find(x=>x.id===e.i); if(!it) return ""; let when=`turn ${e.turn}`; if(full&&ck&&e.t!==null) when=rbClockView(ck,{clock:{t:e.t}}).date; return `<div>${rbItemIcon(it)}${escapeHtml(labOf(it))}${full?`<small>${escapeHtml(when)}</small>`:""}</div>`; };
+    const show=arr.slice(0,full?30:3);
+    body=show.length?`<div class="rb-jl">${show.map(row).join("")}${arr.length>show.length?`<small>+${arr.length-show.length} earlier</small>`:""}</div>`:`<span class="rb-cap">Nothing yet</span>`;
+  } else return "";
+  if(full){
+    extra+=(m.raises||[]).map(x=>`<div class="rb-rl"><span style="color:${OUTCOME_META.success.color}">▲</span> ${escapeHtml(rbSub(x,true))}</div>`).join("")+(m.lowers||[]).map(x=>`<div class="rb-rl"><span style="color:${OUTCOME_META.failure.color}">▼</span> ${escapeHtml(rbSub(x,true))}</div>`).join("");
+  }
+  const tip=[...(m.raises||[]).map(x=>"Rises: "+rbSub(x,true)),...(m.lowers||[]).map(x=>"Falls: "+rbSub(x,true))].join("\n");
+  const tog=(full||pop)?"":' data-act="toggleRbMode" role="button" tabindex="0"';
+  return `<div class="rb-card${full?" full":""}" style="--rb:var(--rbc-${color})"${tog}${tip&&!pop?` title="${attr(tip+(full?"":"\n(click to minimise)"))}"`:(!tip&&!full&&!pop?` title="Click to minimise"`:"")}>
+    <div class="rb-head">${rbIcon(m.icon,15,false)}<span>${escapeHtml(m.label)}</span>${delta}${val?`<span class="rb-val">${E("num",escapeHtml(val))}</span>`:""}</div>
+    ${body}
+    ${level?`<div class="rb-level">${escapeHtml(level)}</div>`:""}
+    ${cap?`<div class="rb-cap">${escapeHtml(rbSub(cap,true))}</div>`:""}${extra}
+  </div>`;
+}
+function rbShownMeters(panel){
+  return rbMeters().filter(m=>(m.visible===true||m.visible==="shown") && m.hud!=="hidden" && (panel||m.hud!=="panel"));
+}
+/* Minimal HUD chip: just the value (colour-coded); the name and display appear in a hover card. */
+function rbItemLabel(it){ return it.revealed===false?"???":it.label; }
+function rbChipText(m){
+  const st=S.rbState;
+  if(rbIsNum(m)){
+    const v=st.values[m.id]; if(typeof v!=="number") return null;
+    const lv=rbLevel(m,v), r=rbRange(m);
+    if(m.type==="number"){ const d=[0,1,2].includes(m.decimals)?m.decimals:0; return m.display==="level"?(lv.revealed===false?"???":lv.label):`${m.unit||""}${v.toFixed(d)}`; }
+    return m.type==="bar"?`${v}/${r.max}`:`${v-r.min}/${r.max-r.min}`;
+  }
+  if(m.type==="clock"){ if(!st.clock) return null; const cv=rbClockView(m,st), dm=`${cv.i.dom} ${RB_MONTHS[cv.i.month-1].slice(0,3)}`; return m.display==="daycount"?`Day ${cv.i.day}`:(cv.dt?`${dm} ${cv.time}`:dm); }
+  if(m.type==="dice"){ const d=st.dice[m.id]; return d?String(d.roll):"–"; }
+  if(m.type==="select"){ const it=m.items.find(i=>i.id===st.sel[m.id]); return it?rbItemLabel(it):"?"; }
+  if(m.type==="collection"){ const n=m.items.filter(it=>rbCount(st,m,it.id)>0).length; return `${n} item${n===1?"":"s"}`; }
+  const n=(st.jrn[m.id]||[]).length; return `${n} event${n===1?"":"s"}`;
+}
+function rbChipHtml(m){
+  const txt=rbChipText(m); if(txt===null) return "";
+  const color=RB_COLORS[m.color]?m.color:"gray";
+  return `<button type="button" class="rb-chip" data-act="toggleRbMode" style="--rb:var(--rbc-${color})" aria-label="${attr(m.label+": "+txt+" (activate to expand)")}">${escapeHtml(txt)}<span class="rb-pop" aria-hidden="true">${rbCardHtml(m,false,true)}</span></button>`;
+}
+function rbSituationsHtml(){
+  const caps=rbActiveRules().map(r=>r.caption).filter(Boolean);
+  return caps.length?`<div class="rb-sit">${caps.map(c=>`<span class="rb-sit-i">${escapeHtml(rbSub(c,true))}</span>`).join("")}</div>`:"";
+}
+function rbHudHtml(){
+  if(!S.rbState) return "";
+  const list=rbShownMeters(false);
+  return S.rbHudMode==="minimal"?list.map(rbChipHtml).join(""):list.map(m=>rbCardHtml(m,false)).join("")+rbSituationsHtml();
+}
+function renderStatusPanelInner(){
+  const list=rbShownMeters(true), rb=S.rulebook&&S.rulebook.rb;
+  const head=rb?`<div class="panel-label">${escapeHtml(rb.name)}${S.rulebook.source==="default"?" (built-in)":""}</div>`:"";
+  const cards=list.length?`<div class="rb-grid">${list.map(m=>rbCardHtml(m,true)).join("")}</div>`:`<div style="color:var(--textD);font-style:italic">This rulebook has no visible meters.</div>`;
+  return `<div>${head}${cards}${rbSituationsHtml()}</div>`;
+}
+function rbAnimate(root){
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    root.querySelectorAll(".rb-fill[data-to]").forEach(f=>{ f.style.width=f.dataset.to+"%"; S.rbShown=S.rbShown||{}; S.rbShown[f.dataset.id]=parseFloat(f.dataset.to); });
+  }));
+}
+function updateStatusUI(){
+  const hud=document.getElementById("rbHud");
+  if(hud){ hud.className=S.rbHudMode==="minimal"?"min":""; hud.innerHTML=S.statusOpen?"":rbHudHtml(); if(!S.statusOpen) rbAnimate(hud); } // the open panel already shows every meter
+  const el=document.getElementById("panelStatus"); if(!el) return;
+  el.className=S.statusOpen?"panel":"";
+  el.innerHTML=S.statusOpen?renderStatusPanelInner():"";
+  if(S.statusOpen) rbAnimate(el);
+}
+
+/* ---- Rulebook modal ---- */
+function rulebookSummary(){
+  const r=S.rulebook&&S.rulebook.rb; if(!r) return "None";
+  const inactive=rbInactive(r).length;
+  return `${r.name} · ${rbMeters().length} meter${rbMeters().length===1?"":"s"}${S.rulebook.source==="default"?" · built-in":""}${inactive?" · partly inactive":""}`;
+}
+function applyRulebook(rb,source,fileName){
+  const old=S.rulebook;
+  S.rulebook={rb,source,fileName:fileName||"",charName:old?old.charName:""};
+  S.rbState=(old&&old.rb&&old.rb.id===rb.id)?rbCleanState(S.rbState,rb):rbInitState(rb); // same id keeps progress
+  S.rbPending=null; S.rbShown={};
+  persistSession(); updateStatusUI(); refreshSettingsHub(); refreshRulebookSetupRow();
+}
+function loadRulebookFile(ev){
+  const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+  const done=()=>{ ev.target.value=""; renderRulebookModal(); };
+  try{ checkFileObject(file,RB_MAX_FILE_CHARS); }
+  catch(e){ S.rbMsg={ok:false,title:"Couldn't load rulebook",lines:[e.message]}; done(); return; }
+  const reader=new FileReader();
+  reader.onload=fev=>{
+    try{
+      const res=rbImport(safeParseFileJSON(fev.target.result,RB_MAX_FILE_CHARS));
+      if(!res.rb){ S.rbMsg={ok:false,title:"Couldn't load rulebook",lines:res.errors}; }
+      else {
+        applyRulebook(res.rb,"file",file.name);
+        const inactive=rbInactive(res.rb);
+        S.rbMsg={ok:true,title:`Loaded "${res.rb.name}".`,lines:[...res.warnings,...(inactive.length?[`Not active yet in this version: ${inactive.join(", ")}.`]:[])]};
+      }
+    }catch(e){ S.rbMsg={ok:false,title:"Couldn't load rulebook",lines:[e.message]}; }
+    done();
+  };
+  reader.onerror=()=>{ S.rbMsg={ok:false,title:"Couldn't read the file",lines:[]}; done(); };
+  reader.readAsText(file);
+}
+function renderRulebookModal(){
+  refreshSettingsHub();
+  let el=document.getElementById("rulebookModal");
+  if(!S.rulebookOpen){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement("div"); el.id="rulebookModal"; document.body.appendChild(el); }
+  const rbo=S.rulebook, rb=rbo&&rbo.rb, m=S.rbMsg, inactive=rb?rbInactive(rb):[];
+  const bs="padding:7px 16px;background:transparent;border:1px solid var(--acc);border-radius:4px;color:var(--accHi);cursor:pointer;font-size:12px";
+  el.innerHTML=`<div data-rb="close" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+    <div style="background:var(--bgCard);border:1px solid var(--bdrM);border-radius:8px;padding:20px;max-width:460px;width:100%;color:var(--text);max-height:90vh;overflow:auto">
+      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);margin-bottom:12px">Rulebook</div>
+      <div style="font-size:13px;margin-bottom:6px">${escapeHtml(rulebookSummary())}</div>
+      ${rb&&rb.description?`<div style="font-size:11px;color:var(--textD);margin-bottom:6px">${escapeHtml(rb.description)}</div>`:""}
+      ${rbo&&rbo.source==="file"&&rbo.fileName?`<div style="font-size:10px;color:var(--textD);margin-bottom:6px">From file: ${escapeHtml(rbo.fileName)}</div>`:""}
+      <div style="font-size:10px;color:var(--textD);margin-bottom:14px">After each player message (and each press of Continue) the rulebook rolls its dice, checks its keyword and AI rules, steps the clock, runs its triggers and tells the narrator how to act at the current levels. Changes apply from the next message.</div>
+      ${inactive.length?`<div style="font-size:11px;color:var(--delClr);margin-bottom:12px">Not active yet in this version: ${escapeHtml(inactive.join(", "))}.</div>`:""}
+      <label style="display:block;font-size:12px;margin-bottom:14px">Character name <span style="font-size:10px;color:var(--textD)">(what {{char}} means in the rules)</span>
+        <input data-rb="char" type="text" maxlength="60" placeholder="blank = the character the scene focuses on" value="${attr(rbo?rbo.charName:"")}" style="width:100%;box-sizing:border-box;font-size:12px;margin-top:4px"/></label>
+      ${m?`<div style="font-size:12px;margin-bottom:12px;color:${m.ok?"var(--accHi)":"var(--delClr)"}"><div>${escapeHtml(m.title)}</div>${m.lines.length?`<ul style="margin:6px 0 0;padding-left:18px;font-size:11px;color:${m.ok?"var(--textM)":"var(--delClr)"};max-height:160px;overflow:auto">${m.lines.map(l=>`<li>${escapeHtml(l)}</li>`).join("")}</ul>`:""}</div>`:""}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button data-rb="pick" style="${bs}">Load rulebook…</button>
+        ${rbo&&rbo.source!=="default"?`<button data-rb="default" style="${bs};border-color:var(--bdrM);color:var(--textM)">Use built-in</button>`:""}
+        <button data-rb="close" style="${bs};border-color:var(--bdrM);color:var(--textM);margin-left:auto">Close</button>
+      </div>
+      <input type="file" id="rulebookFileInput" accept="application/json,.json" style="display:none"/>
+    </div></div>`;
+  el.querySelector("div[data-rb=close]").addEventListener("click",e=>{ if(e.target===e.currentTarget) closeRulebook(); });
+  el.querySelectorAll("button[data-rb=close]").forEach(b=>b.addEventListener("click",closeRulebook));
+  el.querySelector("[data-rb=pick]").addEventListener("click",()=>document.getElementById("rulebookFileInput").click());
+  const df=el.querySelector("[data-rb=default]");
+  if(df) df.addEventListener("click",()=>{ const r=rbDefaultRulebook(); applyRulebook(r.rb,"default"); S.rbMsg={ok:true,title:"Using the built-in rulebook.",lines:[]}; renderRulebookModal(); });
+  el.querySelector("[data-rb=char]").addEventListener("change",e=>{ if(S.rulebook){ S.rulebook.charName=cleanText(e.target.value,60).trim(); persistSession(); updateStatusUI(); } });
+  document.getElementById("rulebookFileInput").addEventListener("change",loadRulebookFile);
+}
+function openRulebook(){ S.rulebookOpen=true; S.rbMsg=null; renderRulebookModal(); }
+function closeRulebook(){ S.rulebookOpen=false; renderRulebookModal(); }
+function refreshRulebookSetupRow(){ const el=document.getElementById("rbSetupSummary"); if(el) el.textContent=rulebookSummary(); }
+
+/* HUD display: "minimal" (value chips) or "expanded" (cards); the open Meters panel is the third, full view. Remembered per browser. */
+S.rbHudMode=(function(){ try{ return window.localStorage.getItem("woven_fate_rb_hud")==="minimal"?"minimal":"expanded"; }catch(e){ return "expanded"; } })();
+function rbToggleHudMode(){
+  S.rbHudMode=S.rbHudMode==="minimal"?"expanded":"minimal";
+  try{ window.localStorage.setItem("woven_fate_rb_hud",S.rbHudMode); }catch(e){}
+  updateStatusUI();
+}
+/* Keep the hover card on screen, and make the cards keyboard-operable. */
+document.addEventListener("mouseover",e=>{ const c=e.target.closest&&e.target.closest(".rb-chip"); if(c) c.classList.toggle("rb-right",c.getBoundingClientRect().left+275>window.innerWidth); });
+document.addEventListener("focusin",e=>{ const c=e.target.closest&&e.target.closest(".rb-chip"); if(c) c.classList.toggle("rb-right",c.getBoundingClientRect().left+275>window.innerWidth); });
+document.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.target.matches&&e.target.matches(".rb-card[data-act]")){ e.preventDefault(); e.target.click(); } });
+
+
+/* ---- Player editing (meters marked userEditable): click a value to change it ---- */
+function rbEditApply(fn){
+  if(!S.rbState||busy()) return;
+  fn(S.rbState);
+  if(S.rbPending){ try{ const b=JSON.parse(S.rbPending.before); fn(b); S.rbPending.before=JSON.stringify(b); }catch(e){} } // a retried turn keeps the edit
+  persistSession(); updateStatusUI();
+}
+function rbSetClock(st,m,o){
+  if(!st.clock) return;
+  const base=rbClockStart(m), info=rbClockInfo(m,st.clock.t);
+  let y=info.year, mo=info.month, d=info.dom, hh=info.hh, mi=info.mi;
+  if(o.date){ const p=/^(\d{4})-(\d{2})-(\d{2})$/.exec(o.date); if(!p) return; y=+p[1]; mo=+p[2]; d=+p[3]; }
+  if(o.day!==undefined){ const b=new Date(base), dt=new Date(Date.UTC(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate()+o.day-1)); y=dt.getUTCFullYear(); mo=dt.getUTCMonth()+1; d=dt.getUTCDate(); }
+  if(o.hh!==undefined){ hh=o.hh; mi=o.mm; }
+  if(y<100) return;
+  const ms=Date.UTC(y,mo-1,d,hh,mi); if(!Number.isFinite(ms)) return;
+  st.clock.t=Math.max(-1e9,Math.min(1e9,Math.round((ms-base)/60000))); st.clock.ctr=0;
+}
+function rbInline(el,o,commit){
+  const inp=document.createElement("input"); inp.className="rb-in"; inp.type=o.type; inp.setAttribute("aria-label","Edit value");
+  for(const k of ["min","max","step"]) if(o[k]!==undefined) inp[k]=o[k];
+  inp.value=o.value; let done=false;
+  const fin=ok=>{
+    if(done) return; done=true;
+    if(ok&&inp.value!==""&&inp.value!==String(o.value)){
+      const v=o.type==="number"?Number(inp.value):inp.value;
+      if(o.type==="number"?Number.isFinite(v):/^\d{4}-\d{2}-\d{2}$/.test(v)){ commit(v); return; }
+    }
+    updateStatusUI();
+  };
+  inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); fin(true); } else if(e.key==="Escape"){ e.preventDefault(); fin(false); } });
+  inp.addEventListener("change",()=>{ if(o.type==="date") fin(true); });
+  inp.addEventListener("blur",()=>fin(true));
+  el.replaceWith(inp); inp.focus();
+  if(o.type==="date"){ try{ if(inp.showPicker) inp.showPicker(); }catch(e){} } else inp.select();
+}
+function rbInlineTime(el,m){
+  const info=rbClockInfo(m,S.rbState.clock.t), w=document.createElement("span"); w.className="rb-ed"; let done=false;
+  w.innerHTML=`<input class="rb-in rb-hm" type="number" min="0" max="23" step="1" value="${info.hh}" aria-label="Hour (0 to 23)"> : <input class="rb-in rb-hm" type="number" min="0" max="59" step="1" value="${info.mi}" aria-label="Minute (0 to 59)">`;
+  const [h,mi]=w.querySelectorAll("input");
+  const fin=ok=>{
+    if(done) return; done=true;
+    const hh=Number(h.value), mm=Number(mi.value);
+    if(ok&&h.value!==""&&mi.value!==""&&Number.isInteger(hh)&&Number.isInteger(mm)&&hh>=0&&hh<=23&&mm>=0&&mm<=59&&(hh!==info.hh||mm!==info.mi)){ rbEditApply(s=>rbSetClock(s,m,{hh,mm})); return; }
+    updateStatusUI();
+  };
+  w.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); fin(true); } else if(e.key==="Escape"){ e.preventDefault(); fin(false); } });
+  w.addEventListener("focusout",()=>setTimeout(()=>{ if(!w.contains(document.activeElement)) fin(true); },0));
+  el.replaceWith(w); h.focus(); h.select();
+}
+function rbEditStart(el){
+  if(busy()||!S.rbState) return;
+  const m=rbById(el.dataset.rbedit); if(!m||m.userEditable!==true||m.type==="dice") return;
+  const st=S.rbState, kind=el.dataset.kind, p2=n=>String(n).padStart(2,"0");
+  if(kind==="opt"){ const id=el.dataset.item; if(m.items.some(i=>i.id===id)) rbEditApply(s=>{ s.sel[m.id]=id; }); return; }
+  if(kind==="coll"){
+    const it=m.items.find(i=>i.id===el.dataset.item); if(!it) return;
+    if(it.kind!=="counted"){ rbEditApply(s=>{ s.coll[m.id][it.id]=rbCount(s,m,it.id)>0?0:1; }); return; }
+    const mx=it.max||9999;
+    rbInline(el,{type:"number",min:0,max:mx,step:1,value:rbCount(st,m,it.id)},v=>rbEditApply(s=>{ s.coll[m.id][it.id]=Math.max(0,Math.min(mx,Math.round(v))); }));
+    return;
+  }
+  if(kind==="num"&&rbIsNum(m)){
+    const r=rbRange(m), pips=m.type==="pips", dec=m.type==="number"?([0,1,2].includes(m.decimals)?m.decimals:0):0, cur=st.values[m.id];
+    rbInline(el,{type:"number",min:pips?0:r.min,max:pips?r.max-r.min:(Number.isFinite(r.max)?r.max:undefined),step:dec?1/Math.pow(10,dec):1,value:pips?cur-r.min:cur},
+      v=>rbEditApply(s=>{ s.values[m.id]=rbFix(m,pips?r.min+v:v); delete s.delta[m.id]; }));
+    return;
+  }
+  if(m.type!=="clock"||!st.clock) return;
+  const info=rbClockInfo(m,st.clock.t);
+  if(kind==="date") rbInline(el,{type:"date",value:`${String(info.year).padStart(4,"0")}-${p2(info.month)}-${p2(info.dom)}`},v=>rbEditApply(s=>rbSetClock(s,m,{date:v})));
+  else if(kind==="day") rbInline(el,{type:"number",min:1,step:1,value:info.day},v=>rbEditApply(s=>rbSetClock(s,m,{day:Math.max(1,Math.min(3650000,Math.round(v)))})));
+  else if(kind==="time"&&m.mode!=="date") rbInlineTime(el,m);
+}
+/* clicks on editable values/inputs must not also minimise the card */
+document.addEventListener("click",e=>{ const t=e.target.closest&&e.target.closest(".rb-edit,.rb-in,.rb-ed"); if(!t) return; e.stopPropagation(); const ed=t.closest(".rb-edit"); if(ed) rbEditStart(ed); },true);
+document.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.target.matches&&e.target.matches("span.rb-edit")){ e.preventDefault(); e.stopPropagation(); rbEditStart(e.target); } },true);
+
+S.rulebook=rbDefaultRulebook(); S.rbState=rbInitState(S.rulebook.rb);
+
 /* ============================== SETTINGS HUB & DEBUG ============================== */
 function debugStatsHtml(d){
   const L=d.lore, rows=[];
@@ -1276,6 +2186,7 @@ function debugStatsHtml(d){
   }
   const D=d.dyn; if(D) rows.push(`Dynamic lore: ${D.triggered} triggered \u00b7 ${D.added.length} added \u00b7 ${D.skipped.length} skipped \u00b7 ${D.used}/${D.budget} chars (story ${D.story})`);
   if(d.dynOps) rows.push(d.dynOps.failed?"Dynamic lore update: failed (retries next turn)":`Dynamic lore update: ${d.dynOps.created} created \u00b7 ${d.dynOps.updated} updated`);
+  if(d.rb){ rows.push(`Rulebook: turn ${d.rb.turn}${d.rb.cont?" (Continue)":""} · ${d.rb.asked} AI question${d.rb.asked===1?"":"s"} · ${d.rb.fired.length} event${d.rb.fired.length===1?"":"s"}${d.rb.failed?" · AI check FAILED":""}`); if(d.rb.fired.length) rows.push(`Fired: ${d.rb.fired.join("; ")}`); if(d.rb.changes&&d.rb.changes.length) rows.push(`Meters: ${d.rb.changes.join(", ")}`); }
   rows.push(`API calls: ${d.calls} \u00b7 ${(d.ms/1000).toFixed(1)}s \u00b7 response ${d.chars} chars`);
   return `<div style="margin-top:8px;padding:6px 10px;border:1px dashed var(--bdrM);border-radius:4px;font:11px/1.5 monospace;color:var(--textD)">${rows.map(escapeHtml).join("<br>")}</div>`;
 }
@@ -1293,9 +2204,10 @@ function refreshSettingsHub(){
   const val="font-size:11px;color:var(--textD);text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
   host.innerHTML=`<div data-sh="close" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px">
     <div style="background:var(--bgCard);border:1px solid var(--bdrM);border-radius:8px;padding:20px;max-width:440px;width:100%;color:var(--text);display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--acc)">Settings</span><span title="App version" style="font-size:10px;color:var(--textD);opacity:0.7;letter-spacing:1px">${APP_VERSION}</span></div>
+      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);margin-bottom:4px">Settings</div>
       <button data-sh="api" style="${row}"><span>API Target</span><span style="${val}">${escapeHtml(activeTargetSummary())}</span></button>
       <button data-sh="lore" style="${row}"><span>Lorebook</span><span style="${val}">${escapeHtml(lorebookSummary())}</span></button>
+      <button data-sh="rb" style="${row}"><span>Rulebook</span><span style="${val}">${escapeHtml(rulebookSummary())}</span></button>
       <label style="${row}"><span>Story lore budget<br><span style="font-size:10px;color:var(--textD)">Characters for the dynamic lorebook (separate from the static one)</span></span><input type="number" min="500" step="500" data-sh="dynbudget" value="${S.dynLore.budget}" style="width:90px"/></label>
       <label style="${row};cursor:pointer"><span>Debug stats<br><span style="font-size:10px;color:var(--textD)">Show lorebook and API stats under each response</span></span><input type="checkbox" data-sh="debug" ${S.debug?"checked":""}/></label>
       <button data-sh="close" style="align-self:flex-end;padding:7px 16px;background:transparent;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);cursor:pointer;font-size:12px">Close</button>
@@ -1304,6 +2216,7 @@ function refreshSettingsHub(){
   host.querySelector("button[data-sh=close]").addEventListener("click",closeSettingsHub);
   host.querySelector("[data-sh=api]").addEventListener("click",openSettingsModal);
   host.querySelector("[data-sh=lore]").addEventListener("click",openLorebook);
+  host.querySelector("[data-sh=rb]").addEventListener("click",openRulebook);
   host.querySelector("[data-sh=dynbudget]").addEventListener("change",e=>{ S.dynLore.budget=Math.max(500,Math.floor(Number(e.target.value))||4000); persistSession(); refreshSettingsHub(); });
   host.querySelector("[data-sh=debug]").addEventListener("change",e=>{
     S.debug=e.target.checked;
@@ -1321,7 +2234,7 @@ function playerInfo(extraText){
     desc: S.player.desc.trim(),
     memoryContext: buildDynContext(extraText || S.player.desc),
     itemsContext: itemsContextString(S.player),
-    conditionsContext: conditionsContextString(S.player),
+    rulebookContext: rulebookContextString(),
   };
 }
 
@@ -1335,40 +2248,18 @@ function handleRandom(){
   });
 }
 
-/* Small models sometimes return the kit as an array of strings or objects
-   instead of the single comma-separated string the prompt asks for; accept
-   those shapes and fold them into one string. */
-function normalizeKit(kit){
-  if(typeof kit==="string") return kit.trim();
-  if(Array.isArray(kit)){
-    const bits=[];
-    for(const x of kit){
-      if(typeof x==="string"){ if(x.trim()) bits.push(x.trim()); }
-      else if(x && typeof x==="object"){
-        const name = (x.item||x.name||x.gear) ? String(x.item||x.name||x.gear).trim() : "";
-        const desc = (x.desc||x.description||x.note) ? String(x.desc||x.description||x.note).trim() : "";
-        if(name) bits.push(desc && desc!==name ? `${name} (${desc})` : name);
-        else if(desc) bits.push(desc);
-      }
-    }
-    return bits.join(", ");
-  }
-  return "";
-}
 async function deriveTools(genderV,descV,settingV,engineV){
   const sObj = SETTINGS.find(x=>x.key===settingV);
   const sl = sObj ? sObj.label : settingV;
   const eObj = ENGINES.find(x=>x.key===engineV);
   const el = eObj ? eObj.label : engineV;
   try{
-    const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer ONE occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then pick 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin).\n\nRespond with ONLY this JSON object and nothing else:\n{"occupation":"<job title, max 6 words, no explanation>","kit":"<comma-separated list of the 2-4 items, each a short noun phrase of max 6 words>"}\nRules: "occupation" must be a short job title only. "kit" must be a single string \u2014 NEVER an array, NEVER nested objects. No markdown, no commentary, no fields beyond these two.`}],"Respond ONLY with raw JSON, no markdown.",500);
+    const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer a plausible occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then list 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin). Return ONLY raw JSON: {"occupation":"...","kit":"..."}`}],"Respond ONLY with raw JSON, no markdown.",200);
     const parsed = parseJSON(raw,null);
-    const occupation = (parsed && typeof parsed.occupation==="string") ? parsed.occupation.trim().slice(0,120) : "";
-    const kit = normalizeKit(parsed ? parsed.kit : undefined).slice(0,400);
-    if(!occupation || !kit){
+    if(!parsed || typeof parsed.occupation!=="string" || !parsed.occupation.trim() || typeof parsed.kit!=="string" || !parsed.kit.trim()){
       return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
     }
-    return {occupation,kit};
+    return parsed;
   }catch(e){
     return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
   }
@@ -1377,15 +2268,15 @@ async function deriveTools(genderV,descV,settingV,engineV){
 async function deriveCharacterNames(descV){
   if(!descV || !descV.trim()) return [];
   try{
-    const raw = await callClaude([{role:"user",content:`Character description: "${descV.trim()}"\n\nExtract any name(s) explicitly given for this character \u2014 civilian name, hero/code name, alias, callsign, etc. Only include names actually stated in the text; do not invent one. Return ONLY raw JSON: {"names":["Name1","Name2"]} (empty array if no name is given).`}],"Respond ONLY with raw JSON, no markdown.",300);
+    const raw = await callClaude([{role:"user",content:`Character description: "${descV.trim()}"\n\nExtract any name(s) explicitly given for this character \u2014 civilian name, hero/code name, alias, callsign, etc. Only include names actually stated in the text; do not invent one. Return ONLY raw JSON: {"names":["Name1","Name2"]} (empty array if no name is given).`}],"Respond ONLY with raw JSON, no markdown.",150);
     const parsed = parseJSON(raw,null);
     if(parsed && Array.isArray(parsed.names)) return parsed.names.filter(n=>typeof n==="string"&&n.trim()).slice(0,3);
   }catch(e){}
   return [];
 }
 
-/* ── Extraction: quest, inventory, characters, conditions \u2014 runs every turn ── */
-async function extractState(narrativeText,pInfo,curQuest,curKey,curItems,curChars,curTools,curConditions){
+/* ── Extraction: quest, inventory, characters \u2014 runs every turn ── */
+async function extractState(narrativeText,pInfo,curQuest,curKey,curItems,curChars,curTools){
   try{
     const toolsLine = curTools ? `Tools of the Trade kit (fixed baseline gear \u2014 NEVER log these or close variants of them as itemsGained, they are not new pickups): ${curTools.kit}` : "Tools of the Trade kit: none set";
     const knownCharsLine = curChars.map(c=>{
@@ -1396,11 +2287,9 @@ async function extractState(narrativeText,pInfo,curQuest,curKey,curItems,curChar
       const noteTag = c.note ? `; ${c.note}` : "";
       return `${primary}${aliasTag} (${roleTag}${noteTag})`;
     }).join("; ")||"none";
-    const cond = curConditions || DEFAULT_CONDITIONS;
-    const condLine = `Current conditions \u2014 superficial: ${cond.superficial.map(c=>c.label).join(", ")||"none"}; moderate: ${cond.moderate.map(c=>c.label).join(", ")||"none"}; severe: ${cond.severe.map(c=>c.label).join(", ")||"none"}; positive: ${cond.positive.map(c=>c.label).join(", ")||"none"}`;
-    const prompt=`Recent narration:\n"""${narrativeText}"""\n\nCurrent quest: ${curQuest?`${curQuest.title} \u2014 ${curQuest.desc}`:"none"}\n${toolsLine}\nCurrent key items: ${curKey.map(i=>i.name).join(", ")||"none"}\nCurrent general items: ${curItems.map(i=>i.name).join(", ")||"none"}\nKnown characters (with what's known about them so far): ${knownCharsLine}\n${condLine}\n\nAnalyse ONLY what this narration establishes. Return ONLY raw JSON:\n{\n "questUpdate": {"action":"set"|"update"|"complete"|"none","title":"...","desc":"..."},\n "itemsGained": [{"name":"...","desc":"...","key":boolean}],\n "itemsLost": ["exact name", ...],\n "characterUpdates": [{"name":"...","present":true|false,"status":"ally|hostile|neutral|unknown|romantic|deceased|other or null","note":"short one-line description/relationship, or null","role":"short stable descriptor of their occupation/role/abilities, or null","alsoKnownAs":"an ADDITIONAL name/alias for this character being genuinely revealed or established this turn (e.g. a hero's civilian identity, or vice versa) \u2014 both names remain valid and may both be used going forward; or null","replaces":"exact prior name from the Known characters list above, ONLY if this character was previously tracked under a different name or generic placeholder (e.g. 'Rescued Hostage') and has now been properly identified as the same individual \u2014 else null"}],\n "conditionsGained": [{"tier":"superficial"|"moderate"|"severe"|"positive","label":"short name","desc":"short description"}],\n "conditionsResolved": ["exact label", ...],\n "sceneEnded": true|false\n}\nRules: For questUpdate \u2014 use "set" ONLY when there was no active quest and a brand-new one is being established. Use "update" when the ALREADY-active quest's specifics, title, or immediate objective are being refined/progressed but it is fundamentally the same overarching goal \u2014 do NOT use "set" for this, that incorrectly signals a brand new quest to the player. Use "complete" when the active quest has just been fully resolved. Use "none" if nothing quest-related changed. Don't invent goals from flavor text alone. Only list itemsGained if something tangible was NEWLY acquired this turn \u2014 never for gear that is part of the Tools of the Trade kit above (that kit is always already carried, mentioning it again is not a new pickup). Only list itemsLost if something was clearly consumed, destroyed, given away, lost, or stolen. key=true only for plot-critical, irreplaceable items.\nFor characterUpdates: include a named, significant character (not background extras) whenever they are present in this scene OR clearly just left/exited it. Only reference characters from the Known characters list, or genuinely new characters actually appearing in THIS narration \u2014 never reuse a name from the Known characters list for an unrelated new character just because it happens to be listed as "known". Set "present" to true if they are in the scene right now, false if they just departed. ONLY set "status" and "note" if something about the character's relationship, disposition, or situation actually changed this turn \u2014 otherwise leave them as null so their prior relationship/description is preserved untouched. NEVER use status or note to describe mere absence (e.g. never write "not present" as a status or note) \u2014 absence is communicated only via "present":false. Use "replaces" to merge a newly-identified character with their prior placeholder entry instead of creating a duplicate. Use "role" to record a STABLE descriptor of who/what this character fundamentally is \u2014 their occupation, position, or abilities (e.g. "Academy student", "History teacher", "City Watch detective") \u2014 and ONLY set it the first time this is established, or if it is later revealed to be genuinely different than previously understood; leave it null on every other turn so it is never overwritten by a description of their current action or last appearance. Do not conflate "role" with "note" \u2014 "note" is for relationship/situation/what just happened, "role" is for their enduring identity. If a known character's role is listed as "unknown" above and this narration provides or clearly implies information that would establish it \u2014 even if this isn't their first appearance \u2014 set "role" now to fill that gap. Use "alsoKnownAs" when a character is revealed to have a second, ongoing identity that will continue to be used alongside their current name (e.g. a hero's secret identity) \u2014 both names stay valid and remain displayed together; this is NOT the same as "replaces", which is only for fully retiring a placeholder label (like "Rescued Hostage") that was never really a name in the first place. When referencing an existing character via "name" or "replaces", use exactly ONE of their individual known names \u2014 never a combined form, and never text like "[also known as: ...]" (that bracketed text is display formatting only, never a real name to echo back).\nFor conditions: only add a new condition if this narration clearly shows the player being hurt, weakened, poisoned, cursed, exhausted, or similarly afflicted (negative), or meaningfully buffed/inspired/emboldened (positive) \u2014 never for flavor text alone. Tier guidance for negative conditions: "superficial" = minor and self-resolving with time (bruises, minor scrapes, being winded); "moderate" = notable but treatable with a deliberate action (a real wound, poisoning, being shaken); "severe" = serious, requiring both treatment and time (a broken bone, a deep wound, a serious curse). Positive conditions are understood to last only for the current scene. List a condition in "conditionsResolved" (by its EXACT current label) ONLY when this narration clearly shows the player actively treating, healing, or otherwise resolving it \u2014 not merely time passing. Set "sceneEnded" to true only when a distinct scene/encounter/conversation has just concluded (a chase or fight that moves through several locations still counts as ONE scene; a new conversation, even in the same location as the last, counts as a NEW scene). Do not invent conditions unsupported by the narration.`;
-    const raw = await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",1000);
-    const parsed = parseJSON(raw,{questUpdate:{action:"none"},itemsGained:[],itemsLost:[],characterUpdates:[],conditionsGained:[],conditionsResolved:[],sceneEnded:false});
+    const prompt=`Recent narration:\n"""${narrativeText}"""\n\nCurrent quest: ${curQuest?`${curQuest.title} \u2014 ${curQuest.desc}`:"none"}\n${toolsLine}\nCurrent key items: ${curKey.map(i=>i.name).join(", ")||"none"}\nCurrent general items: ${curItems.map(i=>i.name).join(", ")||"none"}\nKnown characters (with what's known about them so far): ${knownCharsLine}\n\nAnalyse ONLY what this narration establishes. Return ONLY raw JSON:\n{\n "questUpdate": {"action":"set"|"update"|"complete"|"none","title":"...","desc":"..."},\n "itemsGained": [{"name":"...","desc":"...","key":boolean}],\n "itemsLost": ["exact name", ...],\n "characterUpdates": [{"name":"...","present":true|false,"status":"ally|hostile|neutral|unknown|romantic|deceased|other or null","note":"short one-line description/relationship, or null","role":"short stable descriptor of their occupation/role/abilities, or null","alsoKnownAs":"an ADDITIONAL name/alias for this character being genuinely revealed or established this turn (e.g. a hero's civilian identity, or vice versa) \u2014 both names remain valid and may both be used going forward; or null","replaces":"exact prior name from the Known characters list above, ONLY if this character was previously tracked under a different name or generic placeholder (e.g. 'Rescued Hostage') and has now been properly identified as the same individual \u2014 else null"}]\n}\nRules: For questUpdate \u2014 use "set" ONLY when there was no active quest and a brand-new one is being established. Use "update" when the ALREADY-active quest's specifics, title, or immediate objective are being refined/progressed but it is fundamentally the same overarching goal \u2014 do NOT use "set" for this, that incorrectly signals a brand new quest to the player. Use "complete" when the active quest has just been fully resolved. Use "none" if nothing quest-related changed. Don't invent goals from flavor text alone. Only list itemsGained if something tangible was NEWLY acquired this turn \u2014 never for gear that is part of the Tools of the Trade kit above (that kit is always already carried, mentioning it again is not a new pickup). Only list itemsLost if something was clearly consumed, destroyed, given away, lost, or stolen. key=true only for plot-critical, irreplaceable items.\nFor characterUpdates: include a named, significant character (not background extras) whenever they are present in this scene OR clearly just left/exited it. Only reference characters from the Known characters list, or genuinely new characters actually appearing in THIS narration \u2014 never reuse a name from the Known characters list for an unrelated new character just because it happens to be listed as "known". Set "present" to true if they are in the scene right now, false if they just departed. ONLY set "status" and "note" if something about the character's relationship, disposition, or situation actually changed this turn \u2014 otherwise leave them as null so their prior relationship/description is preserved untouched. NEVER use status or note to describe mere absence (e.g. never write "not present" as a status or note) \u2014 absence is communicated only via "present":false. Use "replaces" to merge a newly-identified character with their prior placeholder entry instead of creating a duplicate. Use "role" to record a STABLE descriptor of who/what this character fundamentally is \u2014 their occupation, position, or abilities (e.g. "Academy student", "History teacher", "City Watch detective") \u2014 and ONLY set it the first time this is established, or if it is later revealed to be genuinely different than previously understood; leave it null on every other turn so it is never overwritten by a description of their current action or last appearance. Do not conflate "role" with "note" \u2014 "note" is for relationship/situation/what just happened, "role" is for their enduring identity. If a known character's role is listed as "unknown" above and this narration provides or clearly implies information that would establish it \u2014 even if this isn't their first appearance \u2014 set "role" now to fill that gap. Use "alsoKnownAs" when a character is revealed to have a second, ongoing identity that will continue to be used alongside their current name (e.g. a hero's secret identity) \u2014 both names stay valid and remain displayed together; this is NOT the same as "replaces", which is only for fully retiring a placeholder label (like "Rescued Hostage") that was never really a name in the first place. When referencing an existing character via "name" or "replaces", use exactly ONE of their individual known names \u2014 never a combined form, and never text like "[also known as: ...]" (that bracketed text is display formatting only, never a real name to echo back).`;
+    const raw = await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",500);
+    const parsed = parseJSON(raw,{questUpdate:{action:"none"},itemsGained:[],itemsLost:[],characterUpdates:[]});
 
     if(parsed.questUpdate && (parsed.questUpdate.action==="set" || parsed.questUpdate.action==="update")){
       const p = S.player;
@@ -1475,58 +2364,6 @@ async function extractState(narrativeText,pInfo,curQuest,curKey,curItems,curChar
       S.player.characters = chars;
     }
 
-    let condResult = {
-      superficial:[...cond.superficial],
-      moderate:[...cond.moderate],
-      severe:[...cond.severe],
-      positive:[...cond.positive],
-    };
-    if(Array.isArray(parsed.conditionsResolved)){
-      for(const label of parsed.conditionsResolved){
-        const midx=condResult.moderate.findIndex(c=>c.label===label);
-        if(midx>=0){ condResult.moderate.splice(midx,1); continue; }
-        const sidx=condResult.severe.findIndex(c=>c.label===label);
-        if(sidx>=0 && !condResult.severe[sidx].treatmentStarted){
-          condResult.severe[sidx]={...condResult.severe[sidx],treatmentStarted:true,turnsLeft:3};
-        }
-      }
-    }
-    if(parsed.sceneEnded){ condResult.positive=[]; }
-    let questFailedByConditions=false;
-    let rejectedConditions=[];
-    if(Array.isArray(parsed.conditionsGained)){
-      for(const cg of parsed.conditionsGained){
-        if(!cg.label)continue;
-        if(cg.tier==="positive"){
-          if(condResult.positive.length<MAX_COND) condResult.positive.push({label:cg.label,desc:cg.desc||""});
-          continue;
-        }
-        let currentTier = ["superficial","moderate","severe"].includes(cg.tier) ? cg.tier : "superficial";
-        let desc=cg.desc||"";
-        let placed=false;
-        while(!placed){
-          if(currentTier==="superficial"){
-            if(condResult.superficial.length<MAX_COND){ condResult.superficial.push({label:cg.label,desc,turnsLeft:3}); placed=true; }
-            else { currentTier="moderate"; desc = desc ? `${desc} \u2014 worse than it looks.` : "Worse than it looks."; }
-          } else if(currentTier==="moderate"){
-            if(condResult.moderate.length<MAX_COND){ condResult.moderate.push({label:cg.label,desc}); placed=true; }
-            else { currentTier="severe"; desc = desc ? `${desc} \u2014 worse than it looks.` : "Worse than it looks."; }
-          } else {
-            if(condResult.severe.length<MAX_COND){ condResult.severe.push({label:cg.label,desc,treatmentStarted:false,turnsLeft:null}); placed=true; }
-            else {
-              if(curQuest) questFailedByConditions=true;
-              rejectedConditions.push(cg.label);
-              placed=true;
-            }
-          }
-        }
-      }
-    }
-    condResult.superficial = condResult.superficial.map(c=>({...c,turnsLeft:c.turnsLeft-1})).filter(c=>c.turnsLeft>0);
-    condResult.severe = condResult.severe.map(c=> c.treatmentStarted ? {...c,turnsLeft:c.turnsLeft-1} : c).filter(c=> !c.treatmentStarted || c.turnsLeft>0);
-    S.player.conditions = condResult;
-    parsed.questFailedByConditions=questFailedByConditions;
-    parsed.rejectedConditions=rejectedConditions;
 
     return parsed;
   }catch(e){return null;}
@@ -1561,8 +2398,7 @@ async function tagQuestFromExtraction(text,pInfo,freshState){
   const iCur = fs.items!==undefined?fs.items:S.player.items;
   const cCur = fs.characters!==undefined?fs.characters:S.player.characters;
   const tCur = fs.tools!==undefined?fs.tools:S.player.tools;
-  const ndCur = fs.conditions!==undefined?fs.conditions:S.player.conditions;
-  const qu=await extractState(text,pInfo,qCur,kCur,iCur,cCur,tCur,ndCur);
+  const qu=await extractState(text,pInfo,qCur,kCur,iCur,cCur,tCur);
   const qAction = qu && qu.questUpdate ? qu.questUpdate.action : undefined;
   if(qAction==="set"){
     const startedBookId = S.books.length ? S.books[S.books.length-1].id : null;
@@ -1578,15 +2414,7 @@ async function tagQuestFromExtraction(text,pInfo,freshState){
       S.bookSuggestion = true;
     }
   }
-  if(qu && qu.questFailedByConditions && qCur){
-    const failedTitle=qCur.title||"";
-    const failedDesc=qCur.desc||"";
-    const startedBookId=qCur.startedBookId!==undefined?qCur.startedBookId:null;
-    S.player.quest=null;
-    S.player.completedQuests=[...(S.player.completedQuests||[]),{title:failedTitle,desc:failedDesc,startedBookId,completedBookId:null,outcome:"failed"}];
-    await appendJournalEvents([`Failed the quest "${failedTitle}"${failedDesc?`: ${failedDesc}`:""} \u2014 worn down by accumulated injury.`]);
-  }
-  if(qu && (qAction==="set"||qAction==="update"||qAction==="complete"||(qu.questFailedByConditions&&qCur)||(qu.rejected&&qu.rejected.key&&qu.rejected.key.length)||(qu.rejected&&qu.rejected.general&&qu.rejected.general.length)||(qu.rejectedConditions&&qu.rejectedConditions.length))){
+  if(qu && (qAction==="set"||qAction==="update"||qAction==="complete"||(qu.rejected&&qu.rejected.key&&qu.rejected.key.length)||(qu.rejected&&qu.rejected.general&&qu.rejected.general.length))){
     const a=[...S.msgs];
     const last={...a[a.length-1]};
     if(qAction==="set"||qAction==="update"||qAction==="complete"){
@@ -1595,14 +2423,8 @@ async function tagQuestFromExtraction(text,pInfo,freshState){
         title: qAction==="complete" ? ((qCur&&qCur.title)||qu.questUpdate.title) : qu.questUpdate.title
       };
     }
-    if(qu.questFailedByConditions && qCur){
-      last.questTag={action:"fail",title:qCur.title||""};
-    }
     if((qu.rejected&&qu.rejected.key&&qu.rejected.key.length)||(qu.rejected&&qu.rejected.general&&qu.rejected.general.length)){
       last.inventoryFullTag={key:(qu.rejected&&qu.rejected.key)||[],general:(qu.rejected&&qu.rejected.general)||[]};
-    }
-    if(qu.rejectedConditions && qu.rejectedConditions.length){
-      last.conditionsFullTag=qu.rejectedConditions;
     }
     a[a.length-1]=last;
     S.msgs=a;
@@ -1639,7 +2461,7 @@ async function performAutosave(narratorCountAtCall){
     const name = `Autosave \u2014 ${labelFor(MOODS,S.mood)} ${labelFor(SETTINGS,S.setting)}${engineLabel}${namesSuffix}`;
     const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
       gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
-      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,lorebook:S.lorebook,dynLore:S.dynLore,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,dynLore:S.dynLore,
       savedAt:Date.now(),isAutosave:true};
     const payloadStr=JSON.stringify(payload);
     if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
@@ -1669,11 +2491,12 @@ function maybeAutosave(){
 }
 
 function takeDebugSnapshot(text){
-  const d={lore:S.lastLoreStats,dyn:S.lastDynStats,calls:S.dbgAcc.calls,ms:S.dbgAcc.ms,chars:(text||"").length};
+  const d={rb:S.lastRbStats,lore:S.lastLoreStats,dyn:S.lastDynStats,calls:S.dbgAcc.calls,ms:S.dbgAcc.ms,chars:(text||"").length};
   S.dbgAcc={calls:0,ms:0};
   return d;
 }
 async function commitNarrative(text,userContent,extraFields){
+  S.rbPending=null;
   extraFields = {debug:takeDebugSnapshot(text),...(extraFields||{})};
   S.msgs=[...S.msgs,{type:"narrator",text,...extraFields}];
   appendMessage(S.msgs[S.msgs.length-1]); // targeted DOM update: append, don't rebuild the log
@@ -1710,8 +2533,9 @@ async function runStep(coreFn,retryKind,retryPayload,replaceIdx){
 }
 
 async function narratorTurnCore(action){
+  await runRulebookTurn(typeof action==="string"?action:"");
   const pInfo=playerInfo(typeof action==="string"?action:"");
-  const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and active conditions (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the player's active moderate/severe negative conditions (working against them) and positive conditions (working in their favor), using this same single modifier tier. Never let superficial conditions influence this. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true),1500);
+  const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and the rulebook state (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the rulebook state (meter levels that hinder or help the player), using this same single modifier tier. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true));
   const parsed=parseJSON(raw,null);
   if(!parsed || typeof parsed!=="object" || !parsed.resolution){
     if(looksLikeDecline(raw)){
@@ -1745,6 +2569,7 @@ async function outcomeTurnCore(pendingV,outcome,meta){
 }
 
 async function continueTurnCore(){
+  await runRulebookTurn("",{cont:true});
   const pInfo=playerInfo();
   const instruction="The player continues with what they're currently doing, letting events progress naturally to the next meaningful moment.";
   const narrative=await callClaude([...S.history,{role:"user",content:`${instruction} 2\u20133 paragraphs, second person. Bold names, italicise places. End the scene open \u2014 do not write what the player says or does next.`}],buildSystem(S.mood,S.setting,S.engine,pInfo));
@@ -1976,7 +2801,7 @@ async function startGame(){
   S.bookSuggestion=false; S.bookModal=null;
   S.suggestions=null; S.suggOpen=false;
   S.lastSaveTurnCount=0;
-  S.player.quest=null; S.player.keyItems=[]; S.player.items=[]; S.player.characters=[]; S.player.completedQuests=[]; S.player.names=[]; S.player.conditions=JSON.parse(JSON.stringify(DEFAULT_CONDITIONS));
+  S.player.quest=null; S.player.keyItems=[]; S.player.items=[]; S.player.characters=[]; S.player.completedQuests=[]; S.player.names=[]; S.rbState=rbInitState(); S.rbPending=null; S.rbShown={}; S.lastRbStats=null;
   S.status="narrating";
   render();
   S.dbgAcc={calls:0,ms:0};
@@ -1986,7 +2811,7 @@ async function startGame(){
   const sObj=SETTINGS.find(x=>x.key===s); const sl=sObj?sObj.label:s;
   const eObj=ENGINES.find(x=>x.key===e); const el=eObj?eObj.label:e;
   const ml=(MOODS.find(x=>x.key===m)||{}).label||m;
-  const pInfo={gender:g,desc:d.trim(),loreContext:buildLoreContext(d)};
+  const pInfo={gender:g,desc:d.trim(),loreContext:buildLoreContext(d),rulebookContext:rulebookContextString()};
   const pBits=[];
   if(g!=="undefined") pBits.push(`a ${g} character`);
   if(d.trim()) pBits.push(`described as: ${d.trim()}`);
@@ -2002,7 +2827,7 @@ async function startGame(){
     S.msgs=[...S.msgs,{type:"narrator",text,debug:takeDebugSnapshot(text)}];
     appendMessage(S.msgs[S.msgs.length-1]);
     S.history=[{role:"assistant",content:text}];
-    await tagQuestFromExtraction(text,pInfo,{tools:toolsResult,quest:null,keyItems:[],items:[],characters:[],conditions:JSON.parse(JSON.stringify(DEFAULT_CONDITIONS))});
+    await tagQuestFromExtraction(text,pInfo,{tools:toolsResult,quest:null,keyItems:[],items:[],characters:[]});
     refreshLastMessageNode();
   },"start",{});
 }
@@ -2024,7 +2849,7 @@ async function handleSaveCurrent(asNew){
   try{
     const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
       gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
-      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,conditions:S.player.conditions,lorebook:S.lorebook,dynLore:S.dynLore,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,dynLore:S.dynLore,
       savedAt:Date.now()};
     const payloadStr=JSON.stringify(payload);
     if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
@@ -2069,10 +2894,10 @@ async function handleLoadSave(id){
         const cleaned=[...new Set(base.names.filter(n=>n && !n.includes(" / ")))];
         return {...base,names: cleaned.length?cleaned:base.names};
       }),completedQuests:d.completedQuests||[],names:d.names||[],
-      conditions:d.conditions||JSON.parse(JSON.stringify(DEFAULT_CONDITIONS)),
     };
     S.memory=d.memory||JSON.parse(JSON.stringify(DEFAULT_MEMORY));
     S.lorebook=d.lorebook||null;
+    { const _rb=rbRestore(d.rulebook,d.rbState); S.rulebook=_rb.rulebook; S.rbState=_rb.state; S.rbPending=null; S.rbShown={}; S.lastRbStats=null; }
     S.dynLore=d.dynLore?{...blankDynLore(),...d.dynLore}:seedDynLoreFromLegacy(d);
     S.books=d.books||[];
     S.activeBookTab=Math.max(0,(d.books||[]).length-1);
@@ -2151,7 +2976,7 @@ function handleImportFile(ev){
   const reader=new FileReader();
   reader.onload=async(fev)=>{
     let d;
-    try{ d=validateSave(parseImportJSON(fev.target.result,SAVE_SIZE_LIMIT_BYTES)); }
+    try{ d=validateSave(safeParseFileJSON(fev.target.result,SAVE_SIZE_LIMIT_BYTES)); }
     catch(e){ S.importStatus=/large/.test(e.message)?"too_large":"error"; render(); ev.target.value=""; return; }
     try{
       const id=newId();
@@ -2525,6 +3350,14 @@ function renderSetupScreen(){
       </div>
     </div>
 
+    <div>
+      <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Rulebook <span style="letter-spacing:0;text-transform:none">(meters that shape the story)</span></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button data-act="openRulebook" class="fade-btn" style="padding:7px 14px;font-size:12px;border:1px solid var(--bdrM);background:transparent;color:var(--textM)">Load / manage</button>
+        <span id="rbSetupSummary" style="font-size:11px;color:var(--textD)">${escapeHtml(rulebookSummary())}</span>
+      </div>
+    </div>
+
     <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
       <div style="display:flex;gap:10px">
         <button data-act="beginTale" ${canBegin?"":"disabled"} style="padding:11px 36px;background:${canBegin?"var(--bgGenre)":"transparent"};border:1px solid ${canBegin?"var(--acc)":"var(--bdrM)"};border-radius:4px;color:${canBegin?"var(--accHi)":"var(--accLo)"};cursor:${canBegin?"pointer":"not-allowed"};font-size:14px;letter-spacing:2px;text-transform:uppercase">Begin Your Tale</button>
@@ -2544,10 +3377,6 @@ function renderSaveBarInner(){
   const b=busy();
   const ssText = S.saveTracking.result==="saved"?"\u2726 Saved":S.saveTracking.result==="loaded"?"\u2726 Loaded":S.saveTracking.result==="autosaved"?"\u2726 Autosaved":S.saveTracking.result==="error"?(S.saveTracking.message?`\u2717 ${S.saveTracking.message}`:"\u2717 Error"):null;
   const ssColor = S.saveTracking.result==="error"?OUTCOME_META.failure.color:OUTCOME_META.success.color;
-  const condCount = ((S.player.conditions&&S.player.conditions.superficial&&S.player.conditions.superficial.length)||0)
-    +((S.player.conditions&&S.player.conditions.moderate&&S.player.conditions.moderate.length)||0)
-    +((S.player.conditions&&S.player.conditions.severe&&S.player.conditions.severe.length)||0)
-    +((S.player.conditions&&S.player.conditions.positive&&S.player.conditions.positive.length)||0);
 
   let statusRight;
   if(S.status==="saving") statusRight="Saving\u2026";
@@ -2563,7 +3392,7 @@ function renderSaveBarInner(){
   return `
     ${smBtnHtml("Save","saveCurrent",{asnew:"0"},S.msgs.length===0||b)}
     ${smBtnHtml("Save As New","saveCurrent",{asnew:"1"},S.msgs.length===0||b)}
-    ${smBtnHtml(S.statusOpen?"Hide Status":`Status${condCount?` (${condCount})`:""}`,"toggleStatus",{},false)}
+    ${smBtnHtml(S.statusOpen?"Hide Meters":"Meters","toggleStatus",{},false)}
     ${smBtnHtml(S.panelOpen?"Hide Quest":"Quest & Items","togglePanel",{},false)}
     ${smBtnHtml(S.journalOpen?"Hide Journal":"Journal","toggleJournal",{},false)}
     ${smBtnHtml(S.booksOpen?"Hide Lore":`Lore${S.dynLore.entries.length?` (${S.dynLore.entries.length})`:""}`,"toggleBooks",{},false)}
@@ -2587,25 +3416,6 @@ function updateHeaderButtons(){
 }
 
 /* ── Game screen: status / inventory / journal / books panels ── */
-function renderStatusPanelInner(){
-  const c = S.player.conditions||DEFAULT_CONDITIONS;
-  function condList(arr,color,symbol,extra){
-    if(!arr || !arr.length) return `<div style="color:var(--textD);font-style:italic">None.</div>`;
-    return arr.map(cc=>`<div style="color:${color};margin-bottom:3px">${symbol} <strong>${escapeHtml(cc.label)}</strong>${cc.desc?` \u2014 ${escapeHtml(cc.desc)}`:""}${extra&&cc.treatmentStarted?" (being treated)":""}</div>`).join("");
-  }
-  return `
-    <div><div class="panel-label">Severe (${c.severe.length}/${MAX_COND})</div>${condList(c.severe,OUTCOME_META.failure.color,"\u25c6",true)}</div>
-    <div><div class="panel-label">Moderate (${c.moderate.length}/${MAX_COND})</div>${condList(c.moderate,OUTCOME_META.mitigated_failure.color,"\u25c7")}</div>
-    <div><div class="panel-label">Superficial (${c.superficial.length}/${MAX_COND})</div>${condList(c.superficial,"var(--textM)","\u00b7")}</div>
-    <div><div class="panel-label">Positive (${c.positive.length}/${MAX_COND})</div>${condList(c.positive,OUTCOME_META.success.color,"\u2726")}</div>
-  `;
-}
-function updateStatusUI(){
-  const el=document.getElementById("panelStatus");
-  if(!el) return;
-  el.className = S.statusOpen ? "panel" : "";
-  el.innerHTML = S.statusOpen ? renderStatusPanelInner() : "";
-}
 
 function renderInventoryPanelInner(){
   const questHtml = S.player.quest
@@ -2676,8 +3486,8 @@ function updateJournalUI(){
 function renderBooksPanelInner(){
   const d=S.dynLore;
   const ents=d.entries.map((e,i)=>({e,i})).sort((a,b)=>a.e.priority-b.e.priority);
-  const entHtml=ents.length?ents.map(({e,i})=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--charClr);font-size:12px">${escapeHtml(e.name)} <span style="color:var(--textD);font-size:10px">P${e.priority}</span></span><button data-act="delDynEntry" data-idx="${i}" title="Delete entry" style="background:none;border:none;color:var(--delClr);cursor:pointer;font-size:15px">\u00d7</button></div><div style="font-size:12px;color:var(--textM);line-height:1.5">${escapeHtml(stripMarkup(e.content))}</div><div style="font-size:10px;color:var(--textD)">Keys: ${escapeHtml(e.keys.join(", "))}</div></div>`).join(""):`<div style="color:var(--textD);font-style:italic">No entries yet \u2014 they're added automatically as the story unfolds.</div>`;
-  return `<div><div class="panel-label">Story So Far (${d.story.length}/${DYN_MAX_STORY})</div><div style="color:var(--text);font-size:12px;line-height:1.6">${d.story?escapeHtml(stripMarkup(d.story)):`<span style="color:var(--textD);font-style:italic">Nothing recorded yet.</span>`}</div></div>
+  const entHtml=ents.length?ents.map(({e,i})=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--charClr);font-size:12px">${escapeHtml(e.name)} <span style="color:var(--textD);font-size:10px">P${e.priority}</span></span><button data-act="delDynEntry" data-idx="${i}" title="Delete entry" style="background:none;border:none;color:var(--delClr);cursor:pointer;font-size:15px">\u00d7</button></div><div style="font-size:12px;color:var(--textM);line-height:1.5">${escapeHtml(e.content)}</div><div style="font-size:10px;color:var(--textD)">Keys: ${escapeHtml(e.keys.join(", "))}</div></div>`).join(""):`<div style="color:var(--textD);font-style:italic">No entries yet \u2014 they're added automatically as the story unfolds.</div>`;
+  return `<div><div class="panel-label">Story So Far (${d.story.length}/${DYN_MAX_STORY})</div><div style="color:var(--text);font-size:12px;line-height:1.6">${d.story?escapeHtml(d.story):`<span style="color:var(--textD);font-style:italic">Nothing recorded yet.</span>`}</div></div>
   <div><div class="panel-label">Story Lore (${d.entries.length}/${DYN_MAX_ENTRIES})</div>${entHtml}</div>`;
 }
 function updateBooksUI(){
@@ -2687,13 +3497,11 @@ function updateBooksUI(){
     el.className="panel";
     el.style.maxHeight="50vh";
     el.style.overflowY="auto";
-    el.style.overflowX="hidden";
     el.innerHTML = renderBooksPanelInner();
   } else {
     el.className="";
     el.style.maxHeight="";
     el.style.overflowY="";
-    el.style.overflowX="";
     el.innerHTML="";
   }
 }
@@ -2735,9 +3543,6 @@ function renderOneMessageHtml(msg,i){
       : msg.questTag.action==="fail" ? `\u2717 Quest Failed: ${escapeHtml(msg.questTag.title)}`
       : `\u2726 Quest Complete: ${escapeHtml(msg.questTag.title||"")}`;
     out += `<div style="font-size:11px;color:${qcolor};letter-spacing:1px;margin-top:8px;opacity:0.9">${qtext}</div>`;
-  }
-  if(msg.conditionsFullTag && msg.conditionsFullTag.length>0){
-    out += `<div style="font-size:11px;color:${OUTCOME_META.failure.color};letter-spacing:0.5px;margin-top:8px;opacity:0.9">\u26a0 Severe conditions at capacity \u2014 untracked: ${escapeHtml(msg.conditionsFullTag.join(", "))}</div>`;
   }
   if(msg.inventoryFullTag && (msg.inventoryFullTag.key.length>0||msg.inventoryFullTag.general.length>0)){
     const full=[...msg.inventoryFullTag.key.map(n=>`${n} (key items full)`),...msg.inventoryFullTag.general.map(n=>`${n} (items full)`)].join(", ");
@@ -2977,6 +3782,7 @@ function mountGameScreen(){
       <button id="hdrNewBtn" class="link-btn" data-act="goScreen" data-screen="setup" ${b?"disabled":""} style="color:${b?"var(--accLo)":"var(--newBtn)"};font-size:11px">New</button>
     `)}
     <div class="sbar" id="sbarContainer"></div>
+    <div id="rbHud"></div>
     <div id="panelStatus"></div>
     <div id="panelInventory"></div>
     <div id="panelJournal"></div>
@@ -3057,6 +3863,8 @@ document.addEventListener("DOMContentLoaded", function(){
       case "openSettings": openSettingsModal(); break;
       case "openSettingsHub": openSettingsHub(); break;
       case "openLorebook": openLorebook(); break;
+      case "openRulebook": openRulebook(); break;
+      case "toggleRbMode": rbToggleHudMode(); break;
       case "closeSettings": {
         if(S.apiTargets.length===0) break; // can't close out of the forced "add one" state
         setState(s=>{ s.settingsOpen=false; }, updateSettingsModal);
