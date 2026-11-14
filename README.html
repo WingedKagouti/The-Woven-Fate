@@ -85,6 +85,7 @@ footer a { color: var(--textM); }
   <li><a href="#whats-in-the-box">What's in the box</a></li>
   <li><a href="#the-woven-fate">The Woven Fate (the game)</a></li>
   <li><a href="#the-woven-fate-dynamic">The Woven Fate: Dynamic</a></li>
+  <li><a href="#the-setup-screen">The setup screen</a></li>
   <li><a href="#rulebooks">Rulebooks</a></li>
   <li><a href="#lorebook-format">Lorebook format</a></li>
   <li><a href="#woven-fate-editor">Woven Fate Editor</a></li>
@@ -189,8 +190,9 @@ footer a { color: var(--textM); }
   <ol>
   <li>Open the file and choose <strong>+ Add API Target</strong> (or the ⚙ icon).</li>
   <li>Pick a service type, enter the URL and your API key, and save. A model name is optional and overrides the default.</li>
-  <li>On the setup screen pick a <strong>setting</strong>, a <strong>plot engine</strong>, a <strong>mood</strong>, and optionally a character gender and description. <strong>Random ⚄</strong> picks for you.</li>
+  <li>On the setup screen pick a <strong>setting</strong>, a <strong>plot engine</strong>, a <strong>mood</strong>, and optionally a character gender and description. <strong>Random ⚄</strong> picks for you. Each choice can be fine-tuned in your own words (see <a href="#the-setup-screen">The setup screen</a>).</li>
   <li>Optionally load a lorebook with <strong>📖 Load / manage</strong>, and a rulebook with the <strong>Rulebook → Load / manage</strong> button below it. Without one, the built-in <em>Health &amp; Fatigue</em> rulebook is used.</li>
+  <li>Optionally write or generate an opening scene and some starting lore.</li>
   <li>Press begin and start acting.</li>
   </ol>
   <h3 id="supported-api-services">Supported API services</h3>
@@ -274,7 +276,7 @@ footer a { color: var(--textM); }
   <li><strong>Suggestions</strong> for what to do next, with re-roll</li>
   <li><strong>Continue the story</strong> and <strong>Regenerate</strong> for the last response. Continue also runs the rulebook, because the last reply can change the meters.</li>
   <li><strong>Books:</strong> when enough has happened the game offers to close a chapter, summarise it, and carry the summary forward</li>
-  <li><strong>Saves:</strong> manual saves, an <strong>autosave</strong> (every 5 turns, toggleable), rename, delete, and export/import as JSON. Meter values are part of the save.</li>
+  <li><strong>Saves:</strong> manual saves, an <strong>autosave</strong> (every 5 turns, toggleable), rename, delete, and export/import as JSON. Meter values, custom mood/setting/plot text, and the starting lore are part of the save. Older saves load fine.</li>
   <li>Light and dark themes</li>
   <li>A <strong>Settings hub</strong> (the ⚙ icon) that gathers the API target, the lorebook, the rulebook, and the <strong>Debug stats</strong> toggle, which shows lorebook, rulebook, and API stats under each response</li>
   </ul>
@@ -316,7 +318,7 @@ footer a { color: var(--textM); }
   </tr>
   </tbody>
   </table>
-  <p>After each turn the AI is asked to update a rolling summary (up to 1,500 characters) and to create or revise entries for people, places, and things that have appeared (up to 150 entries, 600 characters each). These entries are keyed by name and fire like any other lorebook entry, so the game remembers things <em>when they become relevant</em> rather than carrying everything all the time. The story-so-far is always included and is charged to the dynamic budget first. The <strong>Lore</strong> panel lets you browse the entries and the story-so-far.</p>
+  <p>After each turn the AI is asked to update a rolling summary (up to 1,500 characters) and to create or revise entries for people, places, and things that have appeared (up to 150 entries, 600 characters each). These entries are keyed by name and fire like any other lorebook entry, so the game remembers things <em>when they become relevant</em> rather than carrying everything all the time. The story-so-far is always included and is charged to the dynamic budget first. The <strong>Lore</strong> panel lets you browse the starting lore, the story-so-far, and the entries.</p>
   <ul>
   <li>If a memory update fails, it is retried together with the next turn.</li>
   <li>Your own static lorebook still works alongside it, with its own budget.</li>
@@ -324,6 +326,29 @@ footer a { color: var(--textM); }
   <li>Dynamic lore is stored inside your saves. Saves from the standard version can be loaded; their journal and book content is used to seed the story-so-far.</li>
   </ul>
   <p>Pick Dynamic for long campaigns where continuity matters. Pick the standard version for cheaper, simpler sessions.</p>
+  <hr />
+  <h2 id="the-setup-screen">The setup screen</h2>
+  <p><em>(both game files, version 6.0)</em></p>
+  <p>Everything you choose before the first scene can be tuned, generated, saved, and shared.</p>
+  <h3 id="fine-tune-the-mood-setting-and-plot-engine">Fine-tune the mood, setting, and plot engine</h3>
+  <p>Each of the three rows has a <strong>Fine-tune</strong> link. Opening it shows the text the narrator is actually told for the option you picked (for example, "a grounded modern-day setting with current-day technology, urban realism…"), and you can edit it freely, up to 400 characters.</p>
+  <ul>
+  <li>Picking a different preset replaces your text, after asking if you had edited it. <strong>Reset to preset</strong> puts the original back.</li>
+  <li>You can skip the chips for a row and just write your own text. A mood and a setting (from a chip or your own text) are required to begin; the plot engine defaults to Story-Driven.</li>
+  <li>Customised rows are labelled "(custom)" in the story header and on saved tales, for example "Dark · Folk &amp; Myth (custom)".</li>
+  </ul>
+  <h3 id="opening-greeting-and-starting-lore">Opening: greeting and starting lore</h3>
+  <p>Under the rulebook section is an optional <strong>Opening</strong> area with three parts.</p>
+  <ul>
+  <li><strong>Opening hint:</strong> a short note on what the opening should be about ("arriving at a snowbound inn the night before the festival").</li>
+  <li><strong>Greeting:</strong> the opening scene. If you fill it in, it becomes the first scene exactly as written and the game does not generate an opening when you begin. Leave it empty for the usual generated opening. It uses the same style as the story (second person, <strong>bold</strong> character names, <em>italic</em> place names).</li>
+  <li><strong>Starting lore:</strong> permanent background (up to 2,000 characters) that the narrator always has, in addition to any lorebook. It does not use up the lorebook budget. It can include facts you haven't discovered yet, so it is collapsed by default. It is saved with the tale and shown at the top of the <strong>Books</strong> panel (the <strong>Lore</strong> panel in the Dynamic version). In the Dynamic version it is kept separate from the story-so-far and is never rewritten by the AI's memory updates.</li>
+  </ul>
+  <p><strong>✦ Generate setup</strong> asks the AI to write the starting lore and then a greeting that agrees with it. It uses your mood, setting, and plot engine text, your character, the hint, the lorebook (the highest-priority entries, up to a size limit), and the rulebook's starting levels. Each field also has its own <strong>Reroll</strong> button, which keeps the other field as context. Rerolling asks before replacing text, and a failed generation never overwrites what you have. If you change your choices after generating, a note tells you the text may be out of date; nothing is replaced automatically. Generating costs one extra AI call, and no extra call is made for the opening when you use a greeting.</p>
+  <p><strong>Clear</strong> empties the hint, greeting, and starting lore. <strong>Random ⚄</strong> also clears them and any custom text.</p>
+  <h3 id="setup-files">Setup files</h3>
+  <p><strong>Export setup</strong> saves a <code>.setup.json</code> file (schema <code>woven-setup/v1</code>) with the mood, setting, and plot engine (including custom text), the character's gender and description, the opening hint, the greeting, the starting lore, and, if you tick the boxes, the loaded <strong>lorebook</strong> and the <strong>rulebook</strong> (only if it came from a file; the built-in one isn't included), plus the rulebook's character name. API targets and keys are never included.</p>
+  <p><strong>Import setup…</strong> loads such a file into the setup screen. If it contains a lorebook or rulebook and you already have one loaded, you are asked whether to replace it; choosing Cancel keeps yours and imports the rest. The file is checked like other loaded files: oversized files are refused, unusable parts are skipped with a note, and text is cleaned and length-limited. A file that is actually a lorebook, rulebook, or saved tale is recognised and you're told where to load it instead. The <a href="#woven-fate-editor">Woven Fate Editor</a> doesn't edit setup files, but it can edit the lorebook and rulebook inside one once you export them from the game or open them separately.</p>
   <hr />
   <h2 id="rulebooks">Rulebooks</h2>
   <p>A <strong>rulebook</strong> is a set of <strong>meters</strong> that track things about the story, plus rules for how they change and what the narrator is told at each level. It replaces the old fixed "conditions" list. One rulebook is active at a time. You can edit one in the <a href="#woven-fate-editor">Woven Fate Editor</a>.</p>
@@ -737,11 +762,12 @@ footer a { color: var(--textM); }
   <h2 id="privacy-and-storage">Privacy and storage</h2>
   <ul>
   <li>API targets (including <strong>API keys</strong>), saves, session state, and theme preferences are stored in your browser's <code>localStorage</code>. They never leave your machine except in requests to the API service you configured.</li>
-  <li>Your lorebooks, rulebooks, and story text <em>are</em> sent to that service as part of prompts. Rulebooks with AI checks send a short extra request after each message.</li>
+  <li>Your lorebooks, rulebooks, starting lore, custom setup text, and story text <em>are</em> sent to that service as part of prompts. Rulebooks with AI checks send a short extra request after each message.</li>
   <li>Clearing site data for the page removes your keys and saves. Use <strong>Export</strong> on a save to keep a backup.</li>
   <li>Individual saves are limited to roughly 4.8 MB.</li>
   <li>Both game files use the same storage namespace (<code>woven_fate::</code>), so when they are served from the same browser origin they can see each other's saves and API targets. Browsers treat <code>file://</code> pages differently, so if saves don't appear in the other version, use <strong>Export</strong> and <strong>Import</strong>.</li>
   <li>The Editor stores only unsaved drafts and the theme in your browser; nothing is sent anywhere.</li>
+  <li>Setup files are plain JSON you save yourself. They contain your lorebook and rulebook text if you include them, but never API keys.</li>
   </ul>
   <h2 id="requirements">Requirements</h2>
   <p>A current desktop or mobile browser (Chrome, Edge, Firefox, Safari) and, for the game, an API key or a reachable local model endpoint. The Editor, Converter, Test Editor, and Testbench need no API access and work offline.</p>

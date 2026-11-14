@@ -200,7 +200,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v5.2-dynamic";
+const APP_VERSION="v6.0-dynamic";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -515,19 +515,21 @@ const DEFAULT_MEMORY = {events:[],acts:[]};
 
 function buildSystem(mood,setting,engine,playerInfo,isJudge){
   isJudge = isJudge||false;
-  const sl = SETTING_SYSTEM[setting] || setting;
-  const md = MOOD_SYSTEM[mood] || "balanced";
-  const ed = ENGINE_SYSTEM[engine] || ENGINE_SYSTEM.story_driven;
+  const cu = S.custom || {};
+  const sl = (cu.setting||"").trim() || SETTING_SYSTEM[setting] || setting || "an open-ended setting";
+  const md = (cu.mood||"").trim() || MOOD_SYSTEM[mood] || "balanced";
+  const ed = (cu.engine||"").trim() || ENGINE_SYSTEM[engine] || ENGINE_SYSTEM.story_driven;
   const pBits=[];
   if(playerInfo && playerInfo.gender && playerInfo.gender!=="undefined") pBits.push(`gender: ${playerInfo.gender}`);
   if(playerInfo && playerInfo.desc) pBits.push(`description: ${playerInfo.desc}`);
   const pLine = pBits.length ? `\n\nThe player character (always addressed as "you") has the following fixed traits \u2014 keep these consistent in every scene: ${pBits.join("; ")}.` : "";
   const memLine = (playerInfo && playerInfo.memoryContext) ? `\n\nStory so far (for continuity \u2014 do not restate verbatim, just stay consistent with it):\n${playerInfo.memoryContext}` : "";
   const itemsLine = (playerInfo && playerInfo.itemsContext) ? `\n\nThe player currently carries:\n${playerInfo.itemsContext}` : "";
+  const startLine = (playerInfo && playerInfo.startLore) ? `\n\nStarting lore (permanent canon for this story \u2014 always true; stay consistent with it, use it naturally, never quote it or mention that it exists):\n${playerInfo.startLore}` : "";
   const loreLine = (playerInfo && playerInfo.loreContext) ? `\n\nWorld lore (established canon \u2014 stay consistent with it, use it naturally when relevant, never quote it or mention a lorebook):\n${playerInfo.loreContext}` : "";
   const condLine = (playerInfo && playerInfo.rulebookContext) ? `\n\nRulebook — the current state of the story's tracked meters. Treat each note as binding for how the characters behave right now. A note marked PRIORITY overrides what the player's message asks for in this reply: the character acts as the note says even if the player's action says otherwise. Never mention meters, numbers or levels:\n${playerInfo.rulebookContext}` : "";
-  if(isJudge) return `You are a game master running a ${sl} setting with this plot engine: ${ed}. Analyse player actions. Respond ONLY with raw JSON \u2014 no markdown, no explanation.${pLine}${memLine}${itemsLine}${condLine}${loreLine}`;
-  return `You are the game master of a ${sl} setting RPG. Plot engine: ${ed}. Tone: ${md}. Write immersive prose in second person ("You\u2026"). No game-mechanics language. Never break the fourth wall.${pLine}${memLine}${itemsLine}${condLine}${loreLine}\n\nCRITICAL RULE: Never write any dialogue, speech, decisions, or actions performed BY the player character. Other characters may speak and act freely, and you may describe things happening TO or AROUND the player, but the player alone decides what they say or do next. Always end your response at a moment that leaves the next action open to the player \u2014 do not narrate or imply what they say, choose, or do.\n\nFormatting:\n- Wrap character/creature names in **double asterisks**\n- Wrap location/place names in *single asterisks*\n- Always use straight double quotes " " for any spoken dialogue, never single quotes\n- Never wrap dialogue in asterisks or combine it with italics \u2014 dialogue should be plain text inside its quotes\n- Do not wrap anything else`;
+  if(isJudge) return `You are a game master running a ${sl} setting with this plot engine: ${ed}. Analyse player actions. Respond ONLY with raw JSON \u2014 no markdown, no explanation.${pLine}${memLine}${itemsLine}${condLine}${startLine}${loreLine}`;
+  return `You are the game master of a ${sl} setting RPG. Plot engine: ${ed}. Tone: ${md}. Write immersive prose in second person ("You\u2026"). No game-mechanics language. Never break the fourth wall.${pLine}${memLine}${itemsLine}${condLine}${startLine}${loreLine}\n\nCRITICAL RULE: Never write any dialogue, speech, decisions, or actions performed BY the player character. Other characters may speak and act freely, and you may describe things happening TO or AROUND the player, but the player alone decides what they say or do next. Always end your response at a moment that leaves the next action open to the player \u2014 do not narrate or imply what they say, choose, or do.\n\nFormatting:\n- Wrap character/creature names in **double asterisks**\n- Wrap location/place names in *single asterisks*\n- Always use straight double quotes " " for any spoken dialogue, never single quotes\n- Never wrap dialogue in asterisks or combine it with italics \u2014 dialogue should be plain text inside its quotes\n- Do not wrap anything else`;
 }
 
 function memoryContextString(memory,books){
@@ -753,6 +755,7 @@ const S = {
   lorebook: null,
   lorebookOpen: false,
   lorebookMsg: null,
+  custom: {mood:"",setting:"",engine:""}, startLore: "", greeting: "", openHint: "", genSig: "", setupBusy: false, setupMsg: null, setupFileMsg: null, fineOpen: {}, loreFieldOpen: false, expLore: true, expRule: true,
   rulebook: null, rbState: null, rbPending: null, rbMsg: null, rulebookOpen: false, lastRbStats: null, rbShown: {},
   dynLore: {story:"",entries:[],budget:4000,turn:0,pending:[]},
   lastDynStats: null,
@@ -828,7 +831,7 @@ function persistSession(){
     window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
       dark:S.dark, mood:S.mood, setting:S.setting, engine:S.engine,
       player:S.player, memory:S.memory, books:S.books, msgs:S.msgs,
-      history:S.history, screen:S.screen, autosaveEnabled:S.autosaveEnabled, lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,dynLore:S.dynLore,
+      history:S.history, screen:S.screen, autosaveEnabled:S.autosaveEnabled, lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,custom:S.custom,startLore:S.startLore,dynLore:S.dynLore,
       savedAt:Date.now(),
     }));
   }catch(e){ /* storage full/unavailable \u2014 non-fatal, Tales saves are the durable store */ }
@@ -856,7 +859,7 @@ async function refreshSaveList(){
       const r = await window.storage.get(saveKey(id));
       if(r && r.value){
         const d = JSON.parse(r.value);
-        metas.push({id,name:d.name,mood:d.mood,setting:d.setting,engine:d.engine,gender:d.gender,desc:d.desc,savedAt:d.savedAt});
+        metas.push({id,name:d.name,mood:d.mood,setting:d.setting,engine:d.engine,custom:d.custom,gender:d.gender,desc:d.desc,savedAt:d.savedAt});
       }
     }catch(e){}
   }
@@ -956,6 +959,8 @@ function validateSave(d){
   for(const k of ["characters","items","keyItems","completedQuests","names","books"]) if(d[k]!==undefined&&!isArr(d[k])) bad();
   for(const k of ["mood","setting","engine","gender","desc"]) if(d[k]!==undefined&&d[k]!==null&&!isStr(d[k])) bad();
   if(d.lorebook) d.lorebook=normalizeLorebook(d.lorebook); else delete d.lorebook;
+  if(d.custom!==undefined){ const c=(d.custom&&typeof d.custom==="object"&&!isArr(d.custom))?d.custom:{}; d.custom={mood:isStr(c.mood)?cleanText(c.mood,400):"",setting:isStr(c.setting)?cleanText(c.setting,400):"",engine:isStr(c.engine)?cleanText(c.engine,400):""}; }
+  if(d.startLore!==undefined) d.startLore=isStr(d.startLore)?cleanText(d.startLore,2000):"";
   if(d.dynLore){
     const dl=d.dynLore; if(typeof dl!=="object"||isArr(dl)) bad();
     d.dynLore={story:isStr(dl.story)?dl.story.slice(0,1500):"",budget:Math.min(100000,Math.max(500,Math.floor(Number(dl.budget))||4000)),
@@ -2175,6 +2180,257 @@ document.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.ta
 
 S.rulebook=rbDefaultRulebook(); S.rbState=rbInitState(S.rulebook.rb);
 
+/* ============================== SETUP v6: custom fields, opening, starting lore, setup files ============================== */
+const CUSTOM_MAX=400, GREETING_MAX=4000, START_LORE_MAX=2000, HINT_MAX=300, PLAYER_DESC_MAX=4000, SETUP_FILE_MAX_CHARS=3000000;
+const CUSTOM_KINDS={
+  mood:{list:()=>MOODS,sys:()=>MOOD_SYSTEM,title:"mood",ph:"Pick a mood above, or describe the tone in your own words…"},
+  setting:{list:()=>SETTINGS,sys:()=>SETTING_SYSTEM,title:"setting",ph:"Pick a setting above, or describe the world in your own words…"},
+  engine:{list:()=>ENGINES,sys:()=>ENGINE_SYSTEM,title:"plot engine",ph:"Describe how the plot should tend to unfold…"},
+};
+function blankCustom(){ return {mood:"",setting:"",engine:""}; }
+function customOf(k){ return cleanText((S.custom&&S.custom[k])||"",CUSTOM_MAX).trim(); }
+function presetText(k){ const key=S[k]; return (key&&CUSTOM_KINDS[k].sys()[key])||""; }
+function effText(k){ return customOf(k)||presetText(k); }
+function effLabel(k){ const base=S[k]?labelFor(CUSTOM_KINDS[k].list(),S[k]):"Custom"; return customOf(k)&&S[k]?`${base} (custom)`:base; }
+/* Labels for a saved tale's metadata (works for old saves without custom text). */
+function labelsOf(o){
+  const c=(o&&o.custom)||{};
+  return ["mood","setting","engine"].map(k=>{ const key=o&&o[k]; const base=key?labelFor(CUSTOM_KINDS[k].list(),key):"Custom"; return (key&&typeof c[k]==="string"&&c[k].trim())?`${base} (custom)`:base; });
+}
+function setupReady(){ return !!(effText("mood")&&effText("setting")); }
+function setupSig(){
+  return JSON.stringify([effText("mood"),effText("setting"),effText("engine"),S.player.gender,S.player.desc.trim(),(S.openHint||"").trim(),
+    S.lorebook?S.lorebook.name:"",S.rulebook&&S.rulebook.rb?S.rulebook.rb.id:""]);
+}
+function setupStale(){ return !!(S.genSig&&(S.greeting.trim()||S.startLore.trim())&&S.genSig!==setupSig()); }
+
+function chooseKind(k,key){
+  if(S[k]===key) return;
+  if(customOf(k)&&!window.confirm(`Replace your custom ${CUSTOM_KINDS[k].title} text with this preset's text?`)) return;
+  S.custom[k]=""; S[k]=key; render();
+}
+function onCustomInput(el){
+  const k=el.dataset.custom; if(!CUSTOM_KINDS[k]) return;
+  const v=cleanText(el.value,CUSTOM_MAX);
+  S.custom[k]=(v.trim()===presetText(k))?"":v;
+  refreshSetupFlags();
+}
+function refreshSetupFlags(){
+  if(S.screen!=="setup") return;
+  const ok=setupReady()&&!!activeTarget()&&!S.setupBusy;
+  const btn=document.getElementById("beginBtn");
+  if(btn){ btn.disabled=!ok; btn.style.background=ok?"var(--bgGenre)":"transparent"; btn.style.borderColor=ok?"var(--acc)":"var(--bdrM)"; btn.style.color=ok?"var(--accHi)":"var(--accLo)"; btn.style.cursor=ok?"pointer":"not-allowed"; }
+  const gen=setupReady()&&!!activeTarget()&&!S.setupBusy;
+  document.querySelectorAll("[data-act=genSetup]").forEach(b=>{ b.disabled=!gen; b.style.opacity=gen?"1":"0.5"; b.style.cursor=gen?"pointer":"not-allowed"; });
+  for(const k of ["mood","setting","engine"]){
+    const b=document.getElementById("badge-"+k); if(b) b.textContent=customOf(k)?"custom":"";
+    const r=document.getElementById("reset-"+k); if(r) r.style.display=customOf(k)?"inline":"none";
+  }
+  const sn=document.getElementById("staleNote"); if(sn) sn.style.display=setupStale()?"block":"none";
+  const lc=document.getElementById("startLoreCount"); if(lc) lc.textContent=`${S.startLore.length}/${START_LORE_MAX}`;
+}
+
+/* ---- setup screen pieces ---- */
+function fineHtml(k){
+  const kd=CUSTOM_KINDS[k], open=!!(S.fineOpen&&S.fineOpen[k]), cu=customOf(k);
+  return `<div style="margin-top:8px">
+    <button data-act="toggleFine" data-k="${k}" style="background:none;border:none;padding:0;cursor:pointer;font-size:11px;color:var(--link);outline:none">${open?"▾":"▸"} Fine-tune the ${kd.title}</button>
+    <span id="badge-${k}" style="font-size:10px;color:var(--accHi);margin-left:8px;letter-spacing:1px;text-transform:uppercase">${cu?"custom":""}</span>
+    ${open?`<div style="margin-top:6px">
+      <textarea data-custom="${k}" rows="2" maxlength="${CUSTOM_MAX}" placeholder="${attr(kd.ph)}" style="width:100%;resize:vertical;box-sizing:border-box;font-size:12px">${escapeHtml(effText(k))}</textarea>
+      <div style="display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--textD);margin-top:4px"><span>This text is what the narrator is told. Edit it to taste.</span>
+        <button id="reset-${k}" data-act="resetCustom" data-k="${k}" style="display:${cu?"inline":"none"};background:none;border:none;padding:0;cursor:pointer;font-size:10px;color:var(--link);outline:none">Reset to preset</button></div>
+    </div>`:""}
+  </div>`;
+}
+function openingHtml(){
+  const gen=setupReady()&&!!activeTarget()&&!S.setupBusy, m=S.setupMsg;
+  const bs=`padding:6px 12px;font-size:11px;border:1px solid var(--bdrM);background:transparent;color:var(--textM);border-radius:4px;outline:none;`;
+  const gb=(which,label)=>`<button data-act="genSetup" data-which="${which}" ${gen?"":"disabled"} style="${bs}cursor:${gen?"pointer":"not-allowed"};opacity:${gen?1:0.5}">${label}</button>`;
+  const lab=t=>`<div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">${t}</div>`;
+  return `<div>
+    ${lab(`Opening <span style="letter-spacing:0;text-transform:none">(optional — write your own, or generate from the choices above)</span>`)}
+    <textarea id="openHintInput" rows="2" maxlength="${HINT_MAX}" placeholder="Optional: what should the opening be about? e.g. arriving at a snowbound inn the night before the festival" style="width:100%;resize:vertical;box-sizing:border-box">${escapeHtml(S.openHint||"")}</textarea>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">
+      <button data-act="genSetup" data-which="both" ${gen?"":"disabled"} style="padding:8px 18px;font-size:12px;letter-spacing:1px;border:1px solid var(--acc);background:transparent;color:var(--accHi);border-radius:4px;outline:none;cursor:${gen?"pointer":"not-allowed"};opacity:${gen?1:0.5}">${S.setupBusy?"Generating…":"✦ Generate setup"}</button>
+      <button data-act="clearOpening" style="${bs}cursor:pointer">Clear</button>
+      <span id="setupMsg" style="font-size:11px;color:${m&&!m.ok?"var(--delClr)":"var(--textD)"}">${m?escapeHtml(m.text):(!setupReady()?"Choose a mood and a setting first.":!activeTarget()?"Choose an API target first.":"")}</span>
+    </div>
+    <div id="staleNote" style="display:${setupStale()?"block":"none"};font-size:11px;color:var(--accHi);margin-bottom:10px;font-style:italic">Your choices have changed since this was generated. Reroll to update it, or keep editing as it is.</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:12px;color:var(--textM)">Greeting (the opening scene)</span>${gb("greeting",S.greeting.trim()?"Reroll":"Generate")}</div>
+    <textarea id="greetingInput" rows="7" maxlength="${GREETING_MAX}" placeholder="Leave empty and the game writes an opening when you begin. Or write or generate one here — it becomes the first scene exactly as written." style="width:100%;resize:vertical;box-sizing:border-box">${escapeHtml(S.greeting)}</textarea>
+    <div style="font-size:10px;color:var(--textD);margin-top:4px">Written as the story is: second person, **bold** for character names and *italics* for place names. If you fill this in, no opening is generated when you begin.</div>
+    <div style="margin-top:12px">
+      <button data-act="toggleStartLore" style="background:none;border:none;padding:0;cursor:pointer;font-size:12px;color:var(--textM);outline:none">${S.loreFieldOpen?"▾":"▸"} Starting lore <span id="startLoreCount" style="color:var(--textD);font-size:10px">${S.startLore.length}/${START_LORE_MAX}</span></button>
+      ${S.loreFieldOpen?`<div style="margin-top:6px">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:6px">${gb("lore",S.startLore.trim()?"Reroll":"Generate")}</div>
+        <textarea id="startLoreInput" rows="6" maxlength="${START_LORE_MAX}" placeholder="Facts the narrator should always know about this world and situation. Narrator-only background; saved with the tale." style="width:100%;resize:vertical;box-sizing:border-box">${escapeHtml(S.startLore)}</textarea>
+        <div style="font-size:10px;color:var(--textD);margin-top:4px">Always in the narrator's context (it doesn't use up the lorebook budget). It can contain secrets you haven't met yet — you only see it if you open this.</div>
+      </div>`:""}
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--textD)">
+      <span>Setup file:</span>
+      <button data-act="exportSetup" style="${bs}cursor:pointer">Export setup</button>
+      <label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" data-act="toggleExpLore" ${S.expLore?"checked":""}/> lorebook</label>
+      <label style="cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" data-act="toggleExpRule" ${S.expRule?"checked":""}/> rulebook</label>
+      <button data-act="pickSetupFile" style="${bs}cursor:pointer">Import setup…</button>
+      <input type="file" id="setupFileInput" accept="application/json,.json" style="display:none"/>
+    </div>
+    ${S.setupFileMsg?`<div style="margin-top:8px;font-size:11px;color:${S.setupFileMsg.ok?"var(--accHi)":"var(--delClr)"}">${escapeHtml(S.setupFileMsg.text)}${(S.setupFileMsg.lines||[]).length?`<ul style="margin:4px 0 0;padding-left:18px;color:var(--textM)">${S.setupFileMsg.lines.map(l=>`<li>${escapeHtml(l)}</li>`).join("")}</ul>`:""}</div>`:""}
+  </div>`;
+}
+function startLoreCardHtml(){
+  const t=(S.startLore||"").trim(); if(!t) return "";
+  return `<div><div class="panel-label">Starting Lore (${t.length}/${START_LORE_MAX})</div><div style="color:var(--text);font-size:12px;line-height:1.6;white-space:pre-wrap;max-height:9em;overflow-y:auto">${escapeHtml(t)}</div></div>`;
+}
+
+/* ---- generation ---- */
+function loreDigest(){
+  const lb=S.lorebook; if(!lb) return "(no lorebook loaded)";
+  const rows=[...lb.entries].sort((a,b)=>a.priority-b.priority), out=[]; let used=0, n=0;
+  for(const e of rows){
+    const line=`- ${e.name}: ${e.content.replace(/\s+/g," ").slice(0,220)}`;
+    if(used+line.length>4000) break; out.push(line); used+=line.length+1; n++;
+  }
+  return `Lorebook "${lb.name}"${lb.description?` — ${lb.description}`:""} (most important entries first${n<rows.length?`; ${n} of ${rows.length} shown`:""}):\n${out.join("\n")}`;
+}
+function rbDigest(){
+  try{
+    if(!S.rulebook||!S.rulebook.rb) return "(none)";
+    const st=rbInitState(S.rulebook.rb), out=[];
+    for(const m of S.rulebook.rb.meters){
+      if(m.visible===false||m.visible==="hidden") continue;
+      if(rbIsNum(m)){ const v=st.values[m.id]; if(typeof v==="number") out.push(`${m.label}: ${rbLevel(m,v).label}`); }
+      else if(m.type==="select"&&st.sel&&st.sel[m.id]){ const it=m.items.find(x=>x.id===st.sel[m.id]); if(it) out.push(`${m.label}: ${it.label}`); }
+    }
+    return out.length?out.join("; "):"(none)";
+  }catch(e){ return "(none)"; }
+}
+function buildSetupPrompt(which){
+  const g=S.player.gender!=="undefined"?`${S.player.gender}, `:"", d=S.player.desc.trim();
+  const ctx=[
+    `Setting: ${effText("setting")}`,`Plot engine: ${effText("engine")}`,`Tone: ${effText("mood")}`,
+    `Player character: ${g}${d||"not described"}`,
+    `What the player would like the opening to be about: ${(S.openHint||"").trim()||"(no preference)"}`,
+    `World lore:\n${loreDigest()}`,
+    `Starting state of the story's tracked meters: ${rbDigest()}`,
+  ];
+  const gSpec=`"greeting": the opening scene. 2–3 paragraphs, second person ("You…"), vivid and atmospheric, with immediate tension, ending on a moment of choice. Bold character names, italicise place names. Never mention lorebooks, rulebooks, meters or game mechanics.`;
+  const lSpec=`"startingLore": permanent background for the narrator, at most 1500 characters, plain sentences or short lines. State facts that are true at the start and stay true: the world's situation, key people and places, the premise, the tone. It may include background the player character doesn't know yet, but write facts, not scripted events or plot beats. Do not repeat the lorebook entries word for word.`;
+  let task, fixed="";
+  if(which==="greeting"){ task=`Write ONLY the greeting. Return raw JSON: {"greeting": "..."}.\n${gSpec}`; if(S.startLore.trim()) fixed=`\n\nStarting lore already written (stay consistent with it):\n${S.startLore.trim()}`; }
+  else if(which==="lore"){ task=`Write ONLY the starting lore. Return raw JSON: {"startingLore": "..."}.\n${lSpec}`; if(S.greeting.trim()) fixed=`\n\nOpening scene already written (stay consistent with it):\n${S.greeting.trim()}`; }
+  else task=`Write both. Return raw JSON: {"startingLore": "...", "greeting": "..."}. Write the starting lore first so the greeting agrees with it.\n${lSpec}\n${gSpec}`;
+  return `You are preparing the start of an interactive text RPG.\n\n${ctx.join("\n")}${fixed}\n\n${task}`;
+}
+async function generateSetup(which){
+  if(S.setupBusy||!setupReady()||!activeTarget()) return;
+  const hasG=S.greeting.trim(), hasL=S.startLore.trim();
+  const replacing=which==="both"?(hasG||hasL):which==="greeting"?hasG:hasL;
+  if(replacing&&!window.confirm("Replace the current text with newly generated text?")) return;
+  S.setupBusy=true; S.setupMsg=null; render();
+  try{
+    const raw=await callClaude([{role:"user",content:buildSetupPrompt(which)}],"Respond ONLY with raw JSON, no markdown.",2500);
+    const p=parseJSON(raw,null);
+    if(!p||typeof p!=="object") throw new Error("The reply couldn't be read. Try again.");
+    const g=typeof p.greeting==="string"?cleanText(p.greeting,GREETING_MAX).trim():"";
+    const l=typeof p.startingLore==="string"?cleanText(p.startingLore,START_LORE_MAX).trim():"";
+    if((which!=="lore"&&!g)||(which!=="greeting"&&!l)) throw new Error("The reply was missing part of the setup. Try again.");
+    if(which!=="lore") S.greeting=g;
+    if(which!=="greeting"){ S.startLore=l; S.loreFieldOpen=true; }
+    S.genSig=setupSig(); S.setupMsg={ok:true,text:"Generated. Edit anything you like before beginning."};
+  }catch(e){ S.setupMsg={ok:false,text:e.message||"Generation failed."}; }
+  S.setupBusy=false; render(); persistSession();
+}
+function clearOpening(){
+  if((S.greeting.trim()||S.startLore.trim())&&!window.confirm("Clear the opening hint, greeting and starting lore?")) return;
+  S.openHint=""; S.greeting=""; S.startLore=""; S.genSig=""; S.setupMsg=null; render();
+}
+
+/* ---- setup files ---- */
+function exportSetup(){
+  const setup={};
+  for(const k of ["mood","setting","engine"]){ const o={key:S[k]||null}; const t=customOf(k); if(t) o.text=t; setup[k]=o; }
+  setup.character={gender:S.player.gender,description:S.player.desc.trim()};
+  if((S.openHint||"").trim()) setup.opening_hint=S.openHint.trim();
+  if(S.greeting.trim()) setup.greeting=S.greeting.trim();
+  if(S.startLore.trim()) setup.starting_lore=S.startLore.trim();
+  if(S.expLore&&S.lorebook) setup.lorebook=S.lorebook;
+  if(S.expRule&&S.rulebook&&S.rulebook.source==="file"&&S.rulebook.rb){
+    setup.rulebook={schema:"rulebook/v1-draft",rulebook:S.rulebook.rb};
+    if(S.rulebook.charName) setup.char_name=S.rulebook.charName;
+  }
+  const doc={schema:"woven-setup/v1",exported_at:new Date().toISOString(),setup};
+  const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"}), url=URL.createObjectURL(blob), a=document.createElement("a");
+  const nm=`Setup ${effLabel("mood")} ${effLabel("setting")}`.replace(/[^a-z0-9_\- ]/gi,"").trim().replace(/\s+/g,"_")||"Setup";
+  a.href=url; a.download=`${nm}.setup.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  S.setupFileMsg={ok:true,text:"Setup exported."}; render();
+}
+function parseSetupDoc(d){
+  if(d&&typeof d==="object"&&!Array.isArray(d)){
+    if(Array.isArray(d.entries)) throw new Error("This is a lorebook, not a setup file. Load it with the Lorebook button.");
+    if(d.schema==="rulebook/v1-draft") throw new Error("This is a rulebook, not a setup file. Load it with the Rulebook button.");
+    if(Array.isArray(d.msgs)) throw new Error("This is a saved tale, not a setup file. Import it from the saved tales screen.");
+  }
+  if(!d||typeof d!=="object"||d.schema!=="woven-setup/v1"||!d.setup||typeof d.setup!=="object"||Array.isArray(d.setup)) throw new Error("Not a Woven Fate setup file.");
+  const s=d.setup, out={custom:blankCustom(),warnings:[]};
+  for(const k of ["mood","setting","engine"]){
+    const o=s[k]&&typeof s[k]==="object"?s[k]:{};
+    const keys=CUSTOM_KINDS[k].list().map(x=>x.key);
+    out[k]=(typeof o.key==="string"&&keys.includes(o.key))?o.key:null;
+    if(typeof o.key==="string"&&o.key&&!out[k]) out.warnings.push(`Unknown ${CUSTOM_KINDS[k].title} "${cleanText(o.key,40)}" was ignored.`);
+    out.custom[k]=typeof o.text==="string"?cleanText(o.text,CUSTOM_MAX).trim():"";
+    if(out.custom[k]&&out.custom[k]===(out[k]&&CUSTOM_KINDS[k].sys()[out[k]])) out.custom[k]="";
+  }
+  if(!out.engine) out.engine="story_driven";
+  const c=s.character&&typeof s.character==="object"?s.character:{};
+  out.gender=GENDERS.some(g=>g.key===c.gender)?c.gender:"undefined";
+  out.desc=typeof c.description==="string"?cleanText(c.description,PLAYER_DESC_MAX).trim():"";
+  out.hint=typeof s.opening_hint==="string"?cleanText(s.opening_hint,HINT_MAX).trim():"";
+  out.greeting=typeof s.greeting==="string"?cleanText(s.greeting,GREETING_MAX).trim():"";
+  out.startLore=typeof s.starting_lore==="string"?cleanText(s.starting_lore,START_LORE_MAX).trim():"";
+  out.lorebook=null; out.rulebook=null;
+  if(s.lorebook!==undefined){ try{ out.lorebook=normalizeLorebook(s.lorebook); }catch(e){ out.warnings.push(`The lorebook in the file couldn't be used: ${e.message}`); } }
+  if(s.rulebook!==undefined){
+    const r=rbImport(s.rulebook);
+    if(r.rb) out.rulebook={rb:r.rb,charName:typeof s.char_name==="string"?cleanText(s.char_name,60).trim():""};
+    else out.warnings.push("The rulebook in the file couldn't be used: "+(r.errors[0]||"invalid"));
+  }
+  return out;
+}
+function applySetup(p,fileName){
+  let books=true;
+  if((p.lorebook&&S.lorebook)||(p.rulebook&&S.rulebook&&S.rulebook.source==="file")){
+    books=window.confirm("The file includes a lorebook and/or rulebook, and you already have one loaded.\n\nOK = replace what you have loaded.\nCancel = keep yours and import the rest.");
+  }
+  S.mood=p.mood; S.setting=p.setting; S.engine=p.engine; S.custom=p.custom;
+  S.player.gender=p.gender; S.player.desc=p.desc;
+  S.openHint=p.hint; S.greeting=p.greeting; S.startLore=p.startLore; S.loreFieldOpen=!!p.startLore;
+  S.fineOpen={mood:!!p.custom.mood,setting:!!p.custom.setting,engine:!!p.custom.engine};
+  const lines=[...p.warnings];
+  if(books){
+    if(p.lorebook) S.lorebook=p.lorebook;
+    if(p.rulebook){ applyRulebook(p.rulebook.rb,"file",fileName); if(S.rulebook) S.rulebook.charName=p.rulebook.charName; }
+  } else if(p.lorebook||p.rulebook) lines.push("Kept your loaded lorebook/rulebook.");
+  S.genSig=(S.greeting||S.startLore)?setupSig():"";
+  S.setupMsg=null; S.setupFileMsg={ok:true,text:"Setup imported.",lines};
+  persistSession(); render();
+}
+function handleSetupFile(ev){
+  const file=ev.target.files&&ev.target.files[0]; if(!file) return;
+  const done=()=>{ ev.target.value=""; render(); };
+  try{ checkFileObject(file,SETUP_FILE_MAX_CHARS); }
+  catch(e){ S.setupFileMsg={ok:false,text:`Couldn't import: ${e.message}`}; done(); return; }
+  const reader=new FileReader();
+  reader.onload=fev=>{
+    try{ const p=parseSetupDoc(safeParseFileJSON(fev.target.result,SETUP_FILE_MAX_CHARS)); ev.target.value=""; applySetup(p,file.name); }
+    catch(e){ S.setupFileMsg={ok:false,text:`Couldn't import: ${e.message}`}; done(); }
+  };
+  reader.onerror=()=>{ S.setupFileMsg={ok:false,text:"Couldn't read the file."}; done(); };
+  reader.readAsText(file);
+}
+document.addEventListener("change",e=>{ if(e.target&&e.target.id==="setupFileInput") handleSetupFile(e); });
+
 /* ============================== SETTINGS HUB & DEBUG ============================== */
 function debugStatsHtml(d){
   const L=d.lore, rows=[];
@@ -2235,6 +2491,7 @@ function playerInfo(extraText){
     memoryContext: buildDynContext(extraText || S.player.desc),
     itemsContext: itemsContextString(S.player),
     rulebookContext: rulebookContextString(),
+    startLore: S.startLore,
   };
 }
 
@@ -2245,14 +2502,15 @@ function handleRandom(){
     s.engine = pick(ENGINES).key;
     s.player.gender = "undefined";
     s.player.desc = "";
+    s.custom = blankCustom(); s.greeting = ""; s.startLore = ""; s.openHint = ""; s.genSig = ""; s.setupMsg = null;
   });
 }
 
 async function deriveTools(genderV,descV,settingV,engineV){
   const sObj = SETTINGS.find(x=>x.key===settingV);
-  const sl = sObj ? sObj.label : settingV;
+  const sl = customOf("setting") || (sObj ? sObj.label : settingV);
   const eObj = ENGINES.find(x=>x.key===engineV);
-  const el = eObj ? eObj.label : engineV;
+  const el = customOf("engine") || (eObj ? eObj.label : engineV);
   try{
     const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer a plausible occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then list 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin). Return ONLY raw JSON: {"occupation":"...","kit":"..."}`}],"Respond ONLY with raw JSON, no markdown.",200);
     const parsed = parseJSON(raw,null);
@@ -2442,7 +2700,7 @@ async function compactHistory(newHistory){
 async function refreshAutosaveMeta(){
   try{
     const r=await window.storage.get(saveKey(AUTOSAVE_ID));
-    if(r && r.value){ const d=JSON.parse(r.value); S.autosaveMeta={name:d.name,mood:d.mood,setting:d.setting,engine:d.engine,savedAt:d.savedAt}; }
+    if(r && r.value){ const d=JSON.parse(r.value); S.autosaveMeta={name:d.name,mood:d.mood,setting:d.setting,engine:d.engine,custom:d.custom,savedAt:d.savedAt}; }
     else S.autosaveMeta=null;
   }catch(e){ S.autosaveMeta=null; }
 }
@@ -2456,12 +2714,12 @@ function handleToggleAutosave(){
 
 async function performAutosave(narratorCountAtCall){
   try{
-    const engineLabel = S.engine!=="story_driven" ? ` ${labelFor(ENGINES,S.engine)}` : "";
+    const engineLabel = (S.engine!=="story_driven"||customOf("engine")) ? ` ${effLabel("engine")}` : "";
     const namesSuffix = (S.player.names && S.player.names.length) ? ` \u2014 ${S.player.names.join(" / ")}` : "";
-    const name = `Autosave \u2014 ${labelFor(MOODS,S.mood)} ${labelFor(SETTINGS,S.setting)}${engineLabel}${namesSuffix}`;
+    const name = `Autosave \u2014 ${effLabel("mood")} ${effLabel("setting")}${engineLabel}${namesSuffix}`;
     const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
       gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
-      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,dynLore:S.dynLore,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,custom:S.custom,startLore:S.startLore,dynLore:S.dynLore,
       savedAt:Date.now(),isAutosave:true};
     const payloadStr=JSON.stringify(payload);
     if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
@@ -2469,7 +2727,7 @@ async function performAutosave(narratorCountAtCall){
     }
     const res=await window.storage.set(saveKey(AUTOSAVE_ID),payloadStr);
     if(!res) throw new Error("Autosave failed \u2014 storage write did not complete. You may be at your total storage limit; manual saves will likely fail too.");
-    S.autosaveMeta={name,mood:S.mood,setting:S.setting,engine:S.engine,savedAt:payload.savedAt};
+    S.autosaveMeta={name,mood:S.mood,setting:S.setting,engine:S.engine,custom:S.custom,savedAt:payload.savedAt};
     S.lastSaveTurnCount=narratorCountAtCall;
     S.saveTracking={...S.saveTracking,result:"autosaved",message:null};
     render();
@@ -2808,10 +3066,10 @@ async function startGame(){
   const results = await Promise.all([deriveTools(g,d,s,e), deriveCharacterNames(d)]);
   const toolsResult=results[0], namesResult=results[1];
   S.player.tools=toolsResult; S.player.names=namesResult;
-  const sObj=SETTINGS.find(x=>x.key===s); const sl=sObj?sObj.label:s;
-  const eObj=ENGINES.find(x=>x.key===e); const el=eObj?eObj.label:e;
-  const ml=(MOODS.find(x=>x.key===m)||{}).label||m;
-  const pInfo={gender:g,desc:d.trim(),loreContext:buildLoreContext(d),rulebookContext:rulebookContextString()};
+  S.startLore=cleanText(S.startLore||"",START_LORE_MAX).trim();
+  const sl=effLabel("setting"), el=effLabel("engine"), ml=effLabel("mood");
+  const psl=customOf("setting")||(SETTINGS.find(x=>x.key===s)||{}).label||"", pel=customOf("engine")||(ENGINES.find(x=>x.key===e)||{}).label||"", pml=customOf("mood")||(MOODS.find(x=>x.key===m)||{}).label||"";
+  const pInfo={gender:g,desc:d.trim(),loreContext:buildLoreContext(d),rulebookContext:rulebookContextString(),startLore:S.startLore};
   const pBits=[];
   if(g!=="undefined") pBits.push(`a ${g} character`);
   if(d.trim()) pBits.push(`described as: ${d.trim()}`);
@@ -2823,12 +3081,16 @@ async function startGame(){
   if(msgListEl) msgListEl.innerHTML = renderMsgListHtml();
 
   await runStep(async()=>{
-    const text=await callClaude([{role:"user",content:`Begin a new story set in a ${sl} world, with a ${el==="Story-Driven"?"plot that emerges naturally from the setting":el+" plot engine"}, and a ${ml} tone.${pClause} Vivid atmospheric opening, immediate tension, end on a moment of choice. 2\u20133 paragraphs, second person. Bold character names, italicise place names.`}],buildSystem(m,s,e,pInfo));
+    const greeting=cleanText(S.greeting||"",GREETING_MAX).trim();
+    const anyCustom=!!(customOf("setting")||customOf("engine")||customOf("mood"));
+    const openLead=anyCustom?`Begin a new story. Setting: ${psl}. Plot engine: ${pel}. Tone: ${pml}.`:`Begin a new story set in a ${psl} world, with a ${pel==="Story-Driven"?"plot that emerges naturally from the setting":pel+" plot engine"}, and a ${pml} tone.`;
+    const text=greeting||await callClaude([{role:"user",content:`${openLead}${pClause} Vivid atmospheric opening, immediate tension, end on a moment of choice. 2\u20133 paragraphs, second person. Bold character names, italicise place names.`}],buildSystem(m,s,e,pInfo));
     S.msgs=[...S.msgs,{type:"narrator",text,debug:takeDebugSnapshot(text)}];
     appendMessage(S.msgs[S.msgs.length-1]);
     S.history=[{role:"assistant",content:text}];
     await tagQuestFromExtraction(text,pInfo,{tools:toolsResult,quest:null,keyItems:[],items:[],characters:[]});
     refreshLastMessageNode();
+    S.greeting=""; S.genSig="";
   },"start",{});
 }
 
@@ -2841,15 +3103,15 @@ async function handleSaveCurrent(asNew){
   const existing = S.saveList.find(s=>s.id===id);
   let name = existing ? existing.name : undefined;
   if(!name){
-    const engineLabel = S.engine!=="story_driven" ? ` ${labelFor(ENGINES,S.engine)}` : "";
+    const engineLabel = (S.engine!=="story_driven"||customOf("engine")) ? ` ${effLabel("engine")}` : "";
     const namesSuffix = (S.player.names && S.player.names.length) ? ` \u2014 ${S.player.names.join(" / ")}` : "";
-    name = `${labelFor(MOODS,S.mood)} ${labelFor(SETTINGS,S.setting)}${engineLabel} Tale${namesSuffix}`;
+    name = `${effLabel("mood")} ${effLabel("setting")}${engineLabel} Tale${namesSuffix}`;
   }
   let resultMsg=null;
   try{
     const payload={name,msgs:S.msgs.filter(m=>m.type!=="error"),history:S.history,mood:S.mood,setting:S.setting,engine:S.engine,
       gender:S.player.gender,desc:S.player.desc.trim(),quest:S.player.quest,keyItems:S.player.keyItems,items:S.player.items,tools:S.player.tools,
-      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,dynLore:S.dynLore,
+      characters:S.player.characters,completedQuests:S.player.completedQuests,memory:S.memory,books:S.books,names:S.player.names,lorebook:S.lorebook,rulebook:S.rulebook,rbState:S.rbState,custom:S.custom,startLore:S.startLore,dynLore:S.dynLore,
       savedAt:Date.now()};
     const payloadStr=JSON.stringify(payload);
     if(byteLength(payloadStr)>SAVE_SIZE_LIMIT_BYTES){
@@ -2886,6 +3148,7 @@ async function handleLoadSave(id){
     const d=parseStoredSave(r.value);
     S.msgs=d.msgs||[]; S.history=d.history||[]; S.mood=d.mood||null;
     S.setting=d.setting||null; S.engine=d.engine||"story_driven";
+    S.custom=d.custom||blankCustom(); S.startLore=d.startLore||""; S.greeting=""; S.genSig="";
     S.player={
       gender:d.gender||"undefined",desc:d.desc||"",
       quest:d.quest||null,keyItems:d.keyItems||[],items:d.items||[],tools:d.tools||null,
@@ -3170,8 +3433,10 @@ let gameMounted = false;
 function render(){
   applyThemeVars();
   const app=document.getElementById("app");
-  if(S.screen==="saves"){ gameMounted=false; app.innerHTML=renderSavesScreen(); }
-  else if(S.screen==="setup"){ gameMounted=false; app.innerHTML=renderSetupScreen(); }
+  /* Redrawing replaces the scroll container, so remember where it was and put it back. */
+  const keepScroll=(key,html)=>{ const old=app.querySelector('[data-scroller="'+key+'"]'), top=old?old.scrollTop:0; app.innerHTML=html; const nu=app.querySelector('[data-scroller="'+key+'"]'); if(nu&&old) nu.scrollTop=top; };
+  if(S.screen==="saves"){ gameMounted=false; keepScroll("saves",renderSavesScreen()); }
+  else if(S.screen==="setup"){ gameMounted=false; keepScroll("setup",renderSetupScreen()); }
   else {
     if(!gameMounted){ mountGameScreen(); gameMounted=true; }
     else { refreshGameScreen(); }
@@ -3199,7 +3464,7 @@ function renderSavesScreen(){
     cards+=`<div data-act="loadSave" data-id="${attr(AUTOSAVE_ID)}" style="cursor:${b?"not-allowed":"pointer"};opacity:${b?0.6:1};border:1px dashed var(--bookClr);border-radius:6px;padding:12px 14px;background:var(--bgCard);display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div style="min-width:0">
         <div style="color:var(--bookClr);font-size:14px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">\u27f3 ${escapeHtml(am.name)}</div>
-        <div style="color:var(--textD);font-size:11px;letter-spacing:0.5px">${escapeHtml(labelFor(MOODS,am.mood))} \u00b7 ${escapeHtml(labelFor(SETTINGS,am.setting))} \u00b7 ${escapeHtml(labelFor(ENGINES,am.engine))} &nbsp;\u00b7&nbsp; ${escapeHtml(new Date(am.savedAt).toLocaleString())}</div>
+        <div style="color:var(--textD);font-size:11px;letter-spacing:0.5px">${labelsOf(am).map(escapeHtml).join(' \u00b7 ')} &nbsp;\u00b7&nbsp; ${escapeHtml(new Date(am.savedAt).toLocaleString())}</div>
       </div>
       <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
         <button data-act="exportSave" data-id="${attr(AUTOSAVE_ID)}" style="background:none;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);font-size:11px;cursor:pointer;padding:4px 9px;outline:none">Export</button>
@@ -3208,7 +3473,7 @@ function renderSavesScreen(){
     </div>`;
   }
   S.saveList.forEach(sv=>{
-    const ml=labelFor(MOODS,sv.mood), sl=labelFor(SETTINGS,sv.setting), el=labelFor(ENGINES,sv.engine);
+    const [ml,sl,el]=labelsOf(sv);
     if(S.renamingId===sv.id){
       cards+=`<div style="border:1px solid var(--cardBdr);border-radius:6px;padding:12px 14px;background:var(--bgCard);display:flex;justify-content:space-between;align-items:center;gap:10px">
         <div style="flex:1;min-width:0">
@@ -3236,7 +3501,7 @@ function renderSavesScreen(){
 
   return `<div class="hdr-wrap">
     ${headerBarHtml(rightExtra)}
-    <div style="flex:1;overflow-y:auto;padding:24px 26px">
+    <div data-scroller="saves" style="flex:1;overflow-y:auto;padding:24px 26px">
       <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:8px;position:relative">
         <div style="color:var(--textM);font-size:13px;letter-spacing:2px;text-transform:uppercase">Your Tales</div>
         <label style="position:absolute;right:0;display:inline-block;padding:5px 14px;background:transparent;border:1px solid ${b?"var(--bdrM)":"var(--acc)"};border-radius:4px;color:${b?"var(--accLo)":"var(--accHi)"};cursor:${b?"not-allowed":"pointer"};font-size:11px;letter-spacing:0.5px">
@@ -3285,7 +3550,7 @@ function renderSetupScreen(){
     return `<button data-act="setGender" data-key="${attr(g.key)}" class="fade-btn" style="flex:1 1 70px;padding:7px 10px;font-size:13px;border:1px solid ${active?"var(--pABdr)":"var(--bdrM)"};background:${active?"var(--pABg)":"transparent"};color:${active?"var(--pAClr)":"var(--textM)"}">${escapeHtml(g.label)}</button>`;
   }).join("");
 
-  const canBegin = S.mood && S.setting && !!activeTarget();
+  const canBegin = setupReady() && !!activeTarget() && !S.setupBusy;
   const resumeLine = S.saveList.length>0
     ? `<button class="link-btn" data-act="goScreen" data-screen="saves" style="color:var(--link);font-size:12px;text-decoration:underline">Resume a saved tale (${S.saveList.length})</button>`
     : `<button class="link-btn" data-act="goScreen" data-screen="saves" style="color:var(--link);font-size:12px;text-decoration:underline">Import a saved tale</button>`;
@@ -3314,7 +3579,7 @@ function renderSetupScreen(){
   }
 
   return `${headerBarHtml("")}
-  <div style="flex:1;overflow-y:auto;padding:28px 26px 24px;display:flex;flex-direction:column;gap:26px">
+  <div data-scroller="setup" style="flex:1;overflow-y:auto;padding:28px 26px 24px;display:flex;flex-direction:column;gap:26px">
     <div style="text-align:center;color:var(--textM);font-size:13px;letter-spacing:2px;text-transform:uppercase">Choose the nature of your tale</div>
 
     ${targetSection}
@@ -3322,17 +3587,20 @@ function renderSetupScreen(){
     <div>
       <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Mood</div>
       <div class="grid4">${moodGrid}</div>
+      ${fineHtml("mood")}
     </div>
 
     <div>
       <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Setting</div>
       <div class="grid3">${settingGrid}</div>
+      ${fineHtml("setting")}
     </div>
 
     <div>
       <div style="font-size:11px;color:var(--textD);letter-spacing:2px;text-transform:uppercase;margin-bottom:12px">Plot Engine</div>
       <div class="grid4">${engineGrid}</div>
       <div style="font-size:10px;color:var(--textD);margin-top:6px">"Story-Driven" lets the plot shape emerge from the setting and mood alone.</div>
+      ${fineHtml("engine")}
     </div>
 
     <div>
@@ -3358,9 +3626,11 @@ function renderSetupScreen(){
       </div>
     </div>
 
+    ${openingHtml()}
+
     <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
       <div style="display:flex;gap:10px">
-        <button data-act="beginTale" ${canBegin?"":"disabled"} style="padding:11px 36px;background:${canBegin?"var(--bgGenre)":"transparent"};border:1px solid ${canBegin?"var(--acc)":"var(--bdrM)"};border-radius:4px;color:${canBegin?"var(--accHi)":"var(--accLo)"};cursor:${canBegin?"pointer":"not-allowed"};font-size:14px;letter-spacing:2px;text-transform:uppercase">Begin Your Tale</button>
+        <button id="beginBtn" data-act="beginTale" ${canBegin?"":"disabled"} style="padding:11px 36px;background:${canBegin?"var(--bgGenre)":"transparent"};border:1px solid ${canBegin?"var(--acc)":"var(--bdrM)"};border-radius:4px;color:${canBegin?"var(--accHi)":"var(--accLo)"};cursor:${canBegin?"pointer":"not-allowed"};font-size:14px;letter-spacing:2px;text-transform:uppercase">Begin Your Tale</button>
         <button data-act="randomize" style="padding:11px 20px;background:transparent;border:1px solid var(--bdrC);border-radius:4px;color:var(--textM);cursor:pointer;font-size:13px;letter-spacing:1px;text-transform:uppercase">Random \u2684</button>
       </div>
       ${!activeTarget() ? `<div style="color:var(--textD);font-size:10px;font-style:italic">Choose or add an API target above before beginning.</div>` : ""}
@@ -3487,7 +3757,7 @@ function renderBooksPanelInner(){
   const d=S.dynLore;
   const ents=d.entries.map((e,i)=>({e,i})).sort((a,b)=>a.e.priority-b.e.priority);
   const entHtml=ents.length?ents.map(({e,i})=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;gap:8px"><span style="color:var(--charClr);font-size:12px">${escapeHtml(e.name)} <span style="color:var(--textD);font-size:10px">P${e.priority}</span></span><button data-act="delDynEntry" data-idx="${i}" title="Delete entry" style="background:none;border:none;color:var(--delClr);cursor:pointer;font-size:15px">\u00d7</button></div><div style="font-size:12px;color:var(--textM);line-height:1.5">${escapeHtml(e.content)}</div><div style="font-size:10px;color:var(--textD)">Keys: ${escapeHtml(e.keys.join(", "))}</div></div>`).join(""):`<div style="color:var(--textD);font-style:italic">No entries yet \u2014 they're added automatically as the story unfolds.</div>`;
-  return `<div><div class="panel-label">Story So Far (${d.story.length}/${DYN_MAX_STORY})</div><div style="color:var(--text);font-size:12px;line-height:1.6">${d.story?escapeHtml(d.story):`<span style="color:var(--textD);font-style:italic">Nothing recorded yet.</span>`}</div></div>
+  return startLoreCardHtml()+`<div><div class="panel-label">Story So Far (${d.story.length}/${DYN_MAX_STORY})</div><div style="color:var(--text);font-size:12px;line-height:1.6">${d.story?escapeHtml(d.story):`<span style="color:var(--textD);font-style:italic">Nothing recorded yet.</span>`}</div></div>
   <div><div class="panel-label">Story Lore (${d.entries.length}/${DYN_MAX_ENTRIES})</div>${entHtml}</div>`;
 }
 function updateBooksUI(){
@@ -3931,11 +4201,20 @@ document.addEventListener("DOMContentLoaded", function(){
         if(target==="game") scrollBottom();
         break;
       }
-      case "setMood": S.mood = el.dataset.key; render(); break;
-      case "setSetting": S.setting = el.dataset.key; render(); break;
-      case "setEngine": S.engine = el.dataset.key; render(); break;
+      case "setMood": chooseKind("mood",el.dataset.key); break;
+      case "setSetting": chooseKind("setting",el.dataset.key); break;
+      case "setEngine": chooseKind("engine",el.dataset.key); break;
+      case "toggleFine": S.fineOpen=S.fineOpen||{}; S.fineOpen[el.dataset.k]=!S.fineOpen[el.dataset.k]; render(); break;
+      case "resetCustom": S.custom[el.dataset.k]=""; render(); break;
+      case "genSetup": generateSetup(el.dataset.which||"both"); break;
+      case "clearOpening": clearOpening(); break;
+      case "toggleStartLore": S.loreFieldOpen=!S.loreFieldOpen; render(); break;
+      case "exportSetup": exportSetup(); break;
+      case "pickSetupFile": { const fi=document.getElementById("setupFileInput"); if(fi) fi.click(); break; }
+      case "toggleExpLore": S.expLore=el.checked; break;
+      case "toggleExpRule": S.expRule=el.checked; break;
       case "setGender": S.player.gender = el.dataset.key; render(); break;
-      case "beginTale": if(S.mood && S.setting && activeTarget()) startGame(); break;
+      case "beginTale": if(setupReady() && activeTarget() && !S.setupBusy) startGame(); break;
       case "randomize": handleRandom(); break;
       case "selectTargetSetup": setState(s=>{ selectTarget(el.dataset.id); }, render); break;
       case "toggleStatus": setState(s=>{ s.statusOpen=!s.statusOpen; }, ()=>{ updateStatusUI(); updateSaveBar(); }); break;
@@ -3989,7 +4268,15 @@ document.addEventListener("DOMContentLoaded", function(){
       resizeTextarea(e.target);
       updateInputState(); // cheap: only toggles the Act button's disabled state
     } else if(e.target.id==="playerDescInput"){
-      S.player.desc = e.target.value;
+      S.player.desc = e.target.value; refreshSetupFlags();
+    } else if(e.target.dataset && e.target.dataset.custom){
+      onCustomInput(e.target);
+    } else if(e.target.id==="greetingInput"){
+      S.greeting = e.target.value; refreshSetupFlags();
+    } else if(e.target.id==="startLoreInput"){
+      S.startLore = e.target.value; refreshSetupFlags();
+    } else if(e.target.id==="openHintInput"){
+      S.openHint = e.target.value; refreshSetupFlags();
     } else if(e.target.id==="renameInput"){
       S.renameText = e.target.value;
     } else if(e.target.id==="bookCharTextarea"){
