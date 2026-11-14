@@ -200,7 +200,7 @@ const CONTEXT_EVENTS_LIMIT=10, CONTEXT_ACTS_LIMIT=3;
 const SAVE_SIZE_LIMIT_BYTES=4800000;
 const BOOK_SUGGEST_ACTS=1, BOOK_SUGGEST_EVENTS=12;
 const AUTOSAVE_ID="autosave", AUTOSAVE_INTERVAL=5;
-const APP_VERSION="v6.0-dynamic";
+const APP_VERSION="v6.1-dynamic";
 
 const API_CONFIG = {
   defaultUrl: "https://api.anthropic.com/v1/messages",
@@ -286,11 +286,18 @@ function openAiCompatibleParseText(data){
   return typeof content==="string" ? content : null;
 }
 function openAiCompatibleParseError(data){
-  if(!data || !data.error) return null;
-  const err = data.error;
-  const message = typeof err==="string" ? err : (err.message||JSON.stringify(err));
-  const type = (typeof err==="object" && (err.type||err.code)) || "unknown";
-  return {type:String(type), message};
+  if(!data || typeof data!=="object") return null;
+  if(data.error){ // OpenAI-style nested error: {error:{message,type,code}}
+    const err = data.error;
+    const message = typeof err==="string" ? err : (err.message||JSON.stringify(err));
+    const type = (typeof err==="object" && (err.type||err.code)) || "unknown";
+    return {type:String(type), message};
+  }
+  // Mistral-style flat error body: {object:"error", message, type, code, param}
+  if((data.object==="error" || data.code) && data.message){
+    return {type:String(data.type||data.code||"unknown"), message:String(data.message), raw:data};
+  }
+  return null;
 }
 
 const PROVIDERS = {
@@ -563,11 +570,67 @@ function newId(){return `${Date.now()}_${Math.random().toString(36).slice(2,8)}`
 function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
 function byteLength(str){ try{ return new Blob([str]).size; }catch(e){ return str.length; } }
 
+/* ---- Rate-limit safety: per-target spacing queue + retry with backoff ----
+   Strict API tiers (e.g. Mistral free at ~1 request/second) reject bursts, and a turn fires several
+   calls (narration, state extraction, judge, names, memory). Requests are therefore spaced by a
+   per-target minimum gap and transient failures are retried with backoff (honouring Retry-After).
+   The gap defaults to 0 for fast providers and ~1 s for known strict free tiers; each API target
+   can override it ("Min. delay between requests") in its settings. */
+const API_DEFAULT_GAP_MS = {mistral:1100, gemini:1100, groq:1000};
+const API_MAX_RETRIES = 4;
+const API_RETRY_STATUSES = new Set([429, 502, 503, 504]); // 500 gets a single retry (see below)
+let _apiQueueTail = Promise.resolve();
+const _apiLastSent = {};
+function apiSleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+function apiGapMs(target, providerDef){
+  const v = target && target.minDelayMs;
+  if(typeof v==="number" && isFinite(v) && v>=0) return Math.min(v, 60000);
+  return API_DEFAULT_GAP_MS[providerDef.id] || 0;
+}
+function apiSentKey(id){ return "woven_fate_api_last_sent_at:"+id; }
+function apiReadLastSentAt(id){
+  let shared = 0;
+  try{ const v = parseInt(window.localStorage.getItem(apiSentKey(id)),10); if(isFinite(v) && v>0) shared = v; }catch(e){}
+  return Math.max(_apiLastSent[id]||0, shared);
+}
+function apiMarkSent(id){
+  _apiLastSent[id] = Date.now();
+  try{ window.localStorage.setItem(apiSentKey(id), String(_apiLastSent[id])); }catch(e){}
+}
+function callViaApiQueue(id, gapMs, sendFn){
+  const run = async ()=>{
+    const wait = gapMs>0 ? apiReadLastSentAt(id) + gapMs - Date.now() : 0;
+    if(wait>0) await apiSleep(Math.min(wait, gapMs));
+    return sendFn(()=>apiMarkSent(id));
+  };
+  const p = _apiQueueTail.then(run, run);
+  _apiQueueTail = p.catch(()=>{});
+  return p;
+}
+function apiRetryDelayMs(res, attempt){
+  let ra = NaN;
+  try{ ra = parseInt(res.headers && res.headers.get("retry-after"), 10); }catch(e){}
+  if(isFinite(ra) && ra>0 && ra<=120) return Math.min(30000, ra*1000 + 300);
+  return Math.min(30000, 1500*Math.pow(2, attempt));
+}
+function apiRetryNote(text){
+  try{
+    let el = document.getElementById("apiRetryToast");
+    if(!text){ if(el) el.remove(); return; }
+    if(!el){
+      el = document.createElement("div"); el.id="apiRetryToast";
+      el.style.cssText="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;background:var(--surf,#222);color:var(--textM,#ccc);border:1px solid var(--bdrM,#555);border-radius:6px;padding:6px 12px;font-size:12px;pointer-events:none;max-width:90vw";
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+  }catch(e){}
+}
+
 async function callClaude(messages,system,maxTokens){
   const target = activeTarget();
   if(!target){
     openSettingsModal();
-    throw new Error("No API target selected \u2014 add or choose one via the settings icon in the header.");
+    throw new Error("No API target selected — add or choose one via the settings icon in the header.");
   }
   const providerDef = PROVIDERS[target.provider] || PROVIDERS.anthropic;
   const model = (target.model && target.model.trim()) || providerDef.defaultModel;
@@ -577,12 +640,29 @@ async function callClaude(messages,system,maxTokens){
   });
 
   const _t0=Date.now();
-  let res;
+  let res, retried=0;
   try{
-    res = await fetch(endpoint, {method:"POST", headers, body:JSON.stringify(body)});
+    res = await callViaApiQueue(target.id, apiGapMs(target, providerDef), async (markSent)=>{
+      const reqBody = JSON.stringify(body);
+      for(let attempt=0; ; attempt++){
+        markSent(); // stamp immediately before the request actually leaves
+        const r = await fetch(endpoint, {method:"POST", headers, body:reqBody});
+        const maxTries = r.status===500 ? 1 : API_MAX_RETRIES;
+        if((API_RETRY_STATUSES.has(r.status) || r.status===500) && attempt<maxTries){
+          try{ await r.text(); }catch(e2){} // drain the body before retrying
+          const d = apiRetryDelayMs(r, attempt); retried++;
+          apiRetryNote(`"${target.name}" is busy (HTTP ${r.status}) — retrying in ${Math.ceil(d/1000)}s (${attempt+1}/${maxTries})…`);
+          await apiSleep(d);
+          continue;
+        }
+        return r;
+      }
+    });
   }catch(networkErr){
-    throw new Error(`Network error \u2014 could not reach "${target.name}" (${networkErr.message})`);
+    apiRetryNote("");
+    throw new Error(`Network error — could not reach "${target.name}" (${networkErr.message})`);
   }
+  apiRetryNote("");
   let data;
   try{ data = await res.json(); }
   catch(e){ throw new Error(`Bad response from "${target.name}" (HTTP ${res.status})`); }
@@ -593,13 +673,14 @@ async function callClaude(messages,system,maxTokens){
     if(providerDef.id==="anthropic" && (ty==="rate_limit_error"||ty==="overloaded_error"||ty==="exceeded_limit")){
       const resetDate = extractResetTimestamp(errInfo.raw) || extractResetTimestamp(m);
       const resetStr = resetDate ? formatResetTime(resetDate) : null;
-      throw new Error(resetStr ? `Rate limited / overloaded \u2014 limit resets around ${resetStr}` : `Rate limited / overloaded \u2014 try again shortly (${m})`);
+      throw new Error(resetStr ? `Rate limited / overloaded — limit resets around ${resetStr}` : `Rate limited / overloaded — try again shortly (${m})`);
     }
-    if(/rate.?limit/i.test(ty) || res.status===429) throw new Error(`Rate limited / overloaded on "${target.name}" \u2014 try again shortly (${m})`);
+    if(/rate.?limit/i.test(ty) || res.status===429) throw new Error(`Rate limited on "${target.name}" — ${retried?`${retried} spaced retr${retried===1?"y":"ies"} didn't get through, so the limit is likely used up for now`:"try again shortly"} (${m}). If this keeps happening, raise "Min. delay between requests" for this API target.`);
+    if(res.status===500||res.status===502||res.status===503||res.status===504) throw new Error(`"${target.name}" is having server trouble (HTTP ${res.status}${retried?`, after ${retried} retr${retried===1?"y":"ies"}`:""}) — ${m}`);
     if(ty==="invalid_request_error") throw new Error(`Invalid request to "${target.name}" (${m})`);
     if(ty==="authentication_error"||ty==="permission_error"||res.status===401||res.status===403){
       openSettingsModal();
-      throw new Error(`Auth/permission error on "${target.name}" \u2014 check its API key (${m})`);
+      throw new Error(`Auth/permission error on "${target.name}" — check its API key (${m})`);
     }
     throw new Error(`API error from "${target.name}" [${ty}]: ${m}`);
   }
@@ -611,23 +692,113 @@ async function callClaude(messages,system,maxTokens){
   S.dbgAcc.calls++; S.dbgAcc.ms+=Date.now()-_t0;
   return text;
 }
-/* LLMs sometimes wrap JSON in markdown code fences, or occasionally return
-   malformed JSON outright. Strip fences defensively, then fall back to a
-   safe default (and log) rather than letting a parse error crash a turn. */
+/* LLMs sometimes wrap JSON in markdown code fences, or return malformed/truncated JSON. The parser
+   works through: sanitise control chars -> strip fences -> drop embedded fenced blocks -> extract the
+   first balanced object -> repair a cut-off reply; failing all that it returns the fallback. */
 function safeHostname(url){
   try{ return new URL(url).hostname; }catch(e){ return ""; }
+}
+function extractFirstJsonObject(s){
+  for(let start=s.indexOf("{"); start!==-1; start=s.indexOf("{",start+1)){
+    let depth=0, inStr=false, esc=false;
+    for(let i=start;i<s.length;i++){
+      const ch=s[i];
+      if(esc){ esc=false; continue; }
+      if(inStr){
+        if(ch==="\\") esc=true;
+        else if(ch==='"') inStr=false;
+        continue;
+      }
+      if(ch==='"') inStr=true;
+      else if(ch==="{") depth++;
+      else if(ch==="}"){
+        depth--;
+        if(depth===0){
+          try{ return JSON.parse(s.slice(start,i+1)); }catch(e){ break; }
+        }
+      }
+    }
+  }
+  return undefined;
+}
+function closeOpenJson(prefix){
+  const stack=[]; let inStr=false, esc=false;
+  for(let i=0;i<prefix.length;i++){
+    const ch=prefix[i];
+    if(esc){ esc=false; continue; }
+    if(inStr){
+      if(ch==="\\") esc=true;
+      else if(ch==='"') inStr=false;
+      continue;
+    }
+    if(ch==='"') inStr=true;
+    else if(ch==="{") stack.push("}");
+    else if(ch==="[") stack.push("]");
+    else if(ch==="}"||ch==="]") stack.pop();
+  }
+  let out=prefix;
+  if(inStr) out+='"';
+  return out+stack.slice().reverse().join("");
+}
+function repairTruncatedJson(s){
+  /* Salvages a JSON object cut off by the token limit: closes the open structure, then drops the
+     trailing partial field (cutting at commas) until something parses. Input is capped for speed. */
+  const start=s.indexOf("{");
+  if(start===-1) return undefined;
+  const body=s.slice(start, start+60000);
+  const tryParse=(t)=>{ try{ return JSON.parse(t); }catch(e){ return undefined; } };
+  let r=tryParse(closeOpenJson(body));
+  if(r!==undefined) return r;
+  let tries=0;
+  for(let cut=body.length-1;cut>=0 && tries<400;cut--){
+    if(body[cut]===","){
+      tries++;
+      r=tryParse(closeOpenJson(body.slice(0,cut)));
+      if(r!==undefined) return r;
+    }
+  }
+  return undefined;
+}
+function sanitizeJsonStrings(s){
+  /* Escapes raw control characters (literal newline/tab) inside JSON string values only. */
+  let out="", inStr=false, esc=false;
+  for(let i=0;i<s.length;i++){
+    const ch=s[i], c=s.charCodeAt(i);
+    if(esc){ out+=ch; esc=false; continue; }
+    if(inStr){
+      if(ch==="\\"){ out+=ch; esc=true; continue; }
+      if(ch==="\""){ inStr=false; out+=ch; continue; }
+      if(c<0x20){ out += ch==="\n"?"\\n" : ch==="\t"?"\\t" : ch==="\r"?"\\r" : "\\u"+c.toString(16).padStart(4,"0"); continue; }
+      out+=ch; continue;
+    }
+    if(ch==="\"") inStr=true;
+    out+=ch;
+  }
+  return out;
 }
 function safeParseJSON(input, fallback){
   if(fallback===undefined) fallback=null;
   try{
-    const cleanInput = String(input).replace(/```json|```/g,"").trim();
-    return JSON.parse(cleanInput);
+    const raw = sanitizeJsonStrings(String(input));
+    const stripped = raw.replace(/```json|```/g,"").trim();
+    try{ return JSON.parse(stripped); }catch(e1){}
+    /* A whole fenced block embedded inside a string value breaks the JSON; removing it leaves a valid
+       object with that value emptied. Tried before extraction so a garbage object isn't mistaken for
+       the reply. Skipped when the reply is nothing but a fenced block (then the fence IS the reply). */
+    const deblocked = raw.replace(/```[a-zA-Z]*\n?[\s\S]*?```/g,"").replace(/```[a-zA-Z]*\n?/g,"").trim();
+    try{ return JSON.parse(deblocked); }catch(e2){}
+    let ex = extractFirstJsonObject(stripped);
+    if(ex!==undefined) return ex;
+    if(deblocked && deblocked!==stripped){ ex = extractFirstJsonObject(deblocked); if(ex!==undefined) return ex; }
+    const repaired = repairTruncatedJson(stripped);
+    if(repaired!==undefined) return repaired;
+    throw new Error("no JSON object found in reply");
   }catch(err){
     console.error("safeParseJSON: JSON parsing failed, returning fallback state", err, input);
     return fallback;
   }
 }
-const parseJSON = safeParseJSON; // kept as an alias so existing call sites are unaffected
+const parseJSON = safeParseJSON; // parses model replies (lenient); imports use safeParseFileJSON (strict)
 function extractResetTimestamp(errVal){
   let obj=errVal;
   if(typeof obj==="string"){
@@ -716,7 +887,7 @@ const S = {
   settingsOpen: false,
   settingsMode: "list", // "list" | "form"
   editingTargetId: null, // null while adding a brand-new target
-  targetForm: {name:"", url:API_CONFIG.defaultUrl, provider:"anthropic", model:"", key:""},
+  targetForm: {name:"", url:API_CONFIG.defaultUrl, provider:"anthropic", model:"", key:"", minDelay:""},
   apiKeyVisible: false,
   mood: null,
   setting: null,
@@ -778,17 +949,19 @@ function targetSummary(t){
   const modelBit = (t.model && t.model.trim()) || providerDef.defaultModel || "default model";
   return `${providerDef.label.replace(/\s*\(.*$/,"")} \u00b7 ${host} \u00b7 ${modelBit}${t.key ? "" : " \u00b7 no key"}`;
 }
-function addOrUpdateTarget(id, name, url, provider, model, key){
+function parseMinDelay(v){ const t=String(v==null?"":v).trim(); if(t==="") return undefined; const n=Math.round(Number(t)); return isFinite(n)&&n>=0 ? Math.min(n,60000) : undefined; }
+function addOrUpdateTarget(id, name, url, provider, model, key, minDelay){
   const trimmedName = (name||"").trim() || safeHostname(url) || "Untitled target";
   const trimmedUrl = (url||"").trim();
   const trimmedProvider = PROVIDERS[provider] ? provider : "anthropic";
   const trimmedModel = (model||"").trim();
   const trimmedKey = (key||"").trim();
+  const md = parseMinDelay(minDelay);
   if(id){
-    S.apiTargets = S.apiTargets.map(t => t.id===id ? {...t, name:trimmedName, url:trimmedUrl, provider:trimmedProvider, model:trimmedModel, key:trimmedKey} : t);
+    S.apiTargets = S.apiTargets.map(t => t.id===id ? {...t, name:trimmedName, url:trimmedUrl, provider:trimmedProvider, model:trimmedModel, key:trimmedKey, minDelayMs:md} : t);
     return id;
   }
-  const newTarget = {id:newId(), name:trimmedName, url:trimmedUrl, provider:trimmedProvider, model:trimmedModel, key:trimmedKey};
+  const newTarget = {id:newId(), name:trimmedName, url:trimmedUrl, provider:trimmedProvider, model:trimmedModel, key:trimmedKey, minDelayMs:md};
   S.apiTargets = [...S.apiTargets, newTarget];
   return newTarget.id;
 }
@@ -996,6 +1169,21 @@ function normalizeLorebook(d){
 }
 /* Normalise curly quotes, then match a key as a whole word/phrase; "*" matches any word characters. */
 function loreNorm(t){ return String(t).slice(-20000).toLowerCase().replace(/[\u2018\u2019]/g,"'"); }
+/* Strip markdown emphasis/markup from lore text. Lore is injected into prompts
+   as plain text, so ** and friends never render \u2014 they are pure token waste. */
+function stripMarkup(s){
+  return String(s)
+    .replace(/`{1,3}([^`]*)`{1,3}/g,"$1")
+    .replace(/\*\*+(.+?)\*+\*/g,"$1")
+    .replace(/__(.+?)__/g,"$1")
+    .replace(/~~(.+?)~~/g,"$1")
+    .replace(/\*([^*\n]+)\*/g,"$1")
+    .replace(/(^|[^A-Za-z0-9_])_(?!\s)([^_\n]+?)_(?=[^A-Za-z0-9_]|$)/g,"$1$2")
+    .replace(/\s{2,}/g," ")
+    .trim();
+}
+let STRIP_MARKUP=(function(){ try{ return window.localStorage.getItem("woven_fate_strip_markup")!=="0"; }catch(e){ return true; } })();
+function loreText(s){ return STRIP_MARKUP ? stripMarkup(s) : String(s); }
 const LORE_RE_CACHE=new Map();
 function loreKeyRegex(key){
   let re=LORE_RE_CACHE.get(key); if(re) return re;
@@ -1016,7 +1204,8 @@ function loreSelect(lb,scan,budget){
   const out=[], added=[]; let remaining=budget;
   for(let pr=1;pr<=10 && remaining>0;pr++){
     for(const e of shuffle(matched.filter(x=>x.priority===pr))){
-      if(e.content.length<=remaining){ out.push(`[${e.name}] ${e.content}`); added.push(e); remaining-=e.content.length; }
+      const c=loreText(e.content);
+      if(c.length<=remaining){ out.push(`[${e.name}] ${c}`); added.push(e); remaining-=c.length; }
     }
   }
   return {ctx:out.join("\n\n"),stats:{has:true,triggered:matched.length,added:added.map(e=>e.name),
@@ -1038,7 +1227,7 @@ function seedDynLoreFromLegacy(d){
 }
 /* The story-so-far entry is always on and is charged to the dynamic budget first; keyed entries fill the rest. */
 function buildDynContext(extraText){
-  const d=S.dynLore, st=(d.story||"").trim();
+  const d=S.dynLore, st=loreText((d.story||"").trim());
   const r=loreSelect(d,loreScanText(extraText),Math.max(0,d.budget-st.length));
   S.lastDynStats={...r.stats,story:st.length,budget:d.budget,used:r.stats.used+st.length};
   return [st?`[Story so far] ${st}`:"",r.ctx].filter(Boolean).join("\n\n");
@@ -2466,6 +2655,7 @@ function refreshSettingsHub(){
       <button data-sh="rb" style="${row}"><span>Rulebook</span><span style="${val}">${escapeHtml(rulebookSummary())}</span></button>
       <label style="${row}"><span>Story lore budget<br><span style="font-size:10px;color:var(--textD)">Characters for the dynamic lorebook (separate from the static one)</span></span><input type="number" min="500" step="500" data-sh="dynbudget" value="${S.dynLore.budget}" style="width:90px"/></label>
       <label style="${row};cursor:pointer"><span>Debug stats<br><span style="font-size:10px;color:var(--textD)">Show lorebook and API stats under each response</span></span><input type="checkbox" data-sh="debug" ${S.debug?"checked":""}/></label>
+      <label style="${row};cursor:pointer"><span>Strip markdown from lore<br><span style="font-size:10px;color:var(--textD)">Remove *, **, _ and backticks from lore text sent to the model (saves tokens; stored text is untouched)</span></span><input type="checkbox" data-sh="strip" ${STRIP_MARKUP?"checked":""}/></label>
       <button data-sh="close" style="align-self:flex-end;padding:7px 16px;background:transparent;border:1px solid var(--bdrM);border-radius:4px;color:var(--textM);cursor:pointer;font-size:12px">Close</button>
     </div></div>`;
   host.querySelector("div[data-sh=close]").addEventListener("click",e=>{ if(e.target===e.currentTarget) closeSettingsHub(); });
@@ -2474,6 +2664,10 @@ function refreshSettingsHub(){
   host.querySelector("[data-sh=lore]").addEventListener("click",openLorebook);
   host.querySelector("[data-sh=rb]").addEventListener("click",openRulebook);
   host.querySelector("[data-sh=dynbudget]").addEventListener("change",e=>{ S.dynLore.budget=Math.max(500,Math.floor(Number(e.target.value))||4000); persistSession(); refreshSettingsHub(); });
+  host.querySelector("[data-sh=strip]").addEventListener("change",e=>{
+    STRIP_MARKUP=e.target.checked;
+    try{ window.localStorage.setItem("woven_fate_strip_markup",STRIP_MARKUP?"1":"0"); }catch(err){}
+  });
   host.querySelector("[data-sh=debug]").addEventListener("change",e=>{
     S.debug=e.target.checked;
     try{ window.localStorage.setItem("woven_fate_debug",S.debug?"1":"0"); }catch(err){}
@@ -2506,18 +2700,40 @@ function handleRandom(){
   });
 }
 
+/* Small models sometimes return the kit as an array of strings or objects
+   instead of the single comma-separated string the prompt asks for; accept
+   those shapes and fold them into one string. */
+function normalizeKit(kit){
+  if(typeof kit==="string") return kit.trim();
+  if(Array.isArray(kit)){
+    const bits=[];
+    for(const x of kit){
+      if(typeof x==="string"){ if(x.trim()) bits.push(x.trim()); }
+      else if(x && typeof x==="object"){
+        const name = (x.item||x.name||x.gear) ? String(x.item||x.name||x.gear).trim() : "";
+        const desc = (x.desc||x.description||x.note) ? String(x.desc||x.description||x.note).trim() : "";
+        if(name) bits.push(desc && desc!==name ? `${name} (${desc})` : name);
+        else if(desc) bits.push(desc);
+      }
+    }
+    return bits.join(", ");
+  }
+  return "";
+}
 async function deriveTools(genderV,descV,settingV,engineV){
   const sObj = SETTINGS.find(x=>x.key===settingV);
-  const sl = customOf("setting") || (sObj ? sObj.label : settingV);
+  const sl = sObj ? sObj.label : settingV;
   const eObj = ENGINES.find(x=>x.key===engineV);
-  const el = customOf("engine") || (eObj ? eObj.label : engineV);
+  const el = eObj ? eObj.label : engineV;
   try{
-    const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer a plausible occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then list 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin). Return ONLY raw JSON: {"occupation":"...","kit":"..."}`}],"Respond ONLY with raw JSON, no markdown.",200);
+    const raw = await callClaude([{role:"user",content:`Player description: "${descV.trim()||"none given"}". Gender: ${genderV}. Story setting: ${sl}. Plot engine: ${el}.\n\nInfer ONE occupation/role for this character. If the description clearly states or strongly implies one, use that. Otherwise, infer something that fits the setting and plot engine naturally (e.g. a Contemporary Detective story implies a detective/investigator, a Sci-Fi Superhero story implies a hero with sci-fi-appropriate gear) \u2014 do NOT default to a generic "Traveler" with rustic gear if the setting/engine suggest something more specific. Then pick 2-4 items/gear they would reasonably always carry for that role, fitting to the setting (e.g. a contemporary detective carries a phone and a badge, not a waterskin).\n\nRespond with ONLY this JSON object and nothing else:\n{"occupation":"<job title, max 6 words, no explanation>","kit":"<comma-separated list of the 2-4 items, each a short noun phrase of max 6 words>"}\nRules: "occupation" must be a short job title only. "kit" must be a single string \u2014 NEVER an array, NEVER nested objects. No markdown, no commentary, no fields beyond these two.`}],"Respond ONLY with raw JSON, no markdown.",500);
     const parsed = parseJSON(raw,null);
-    if(!parsed || typeof parsed.occupation!=="string" || !parsed.occupation.trim() || typeof parsed.kit!=="string" || !parsed.kit.trim()){
+    const occupation = (parsed && typeof parsed.occupation==="string") ? parsed.occupation.trim().slice(0,120) : "";
+    const kit = normalizeKit(parsed ? parsed.kit : undefined).slice(0,400);
+    if(!occupation || !kit){
       return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
     }
-    return parsed;
+    return {occupation,kit};
   }catch(e){
     return {occupation:"Traveler",kit:"a simple pack with basic provisions"};
   }
@@ -2526,7 +2742,7 @@ async function deriveTools(genderV,descV,settingV,engineV){
 async function deriveCharacterNames(descV){
   if(!descV || !descV.trim()) return [];
   try{
-    const raw = await callClaude([{role:"user",content:`Character description: "${descV.trim()}"\n\nExtract any name(s) explicitly given for this character \u2014 civilian name, hero/code name, alias, callsign, etc. Only include names actually stated in the text; do not invent one. Return ONLY raw JSON: {"names":["Name1","Name2"]} (empty array if no name is given).`}],"Respond ONLY with raw JSON, no markdown.",150);
+    const raw = await callClaude([{role:"user",content:`Character description: "${descV.trim()}"\n\nExtract any name(s) explicitly given for this character \u2014 civilian name, hero/code name, alias, callsign, etc. Only include names actually stated in the text; do not invent one. Return ONLY raw JSON: {"names":["Name1","Name2"]} (empty array if no name is given).`}],"Respond ONLY with raw JSON, no markdown.",300);
     const parsed = parseJSON(raw,null);
     if(parsed && Array.isArray(parsed.names)) return parsed.names.filter(n=>typeof n==="string"&&n.trim()).slice(0,3);
   }catch(e){}
@@ -2546,7 +2762,7 @@ async function extractState(narrativeText,pInfo,curQuest,curKey,curItems,curChar
       return `${primary}${aliasTag} (${roleTag}${noteTag})`;
     }).join("; ")||"none";
     const prompt=`Recent narration:\n"""${narrativeText}"""\n\nCurrent quest: ${curQuest?`${curQuest.title} \u2014 ${curQuest.desc}`:"none"}\n${toolsLine}\nCurrent key items: ${curKey.map(i=>i.name).join(", ")||"none"}\nCurrent general items: ${curItems.map(i=>i.name).join(", ")||"none"}\nKnown characters (with what's known about them so far): ${knownCharsLine}\n\nAnalyse ONLY what this narration establishes. Return ONLY raw JSON:\n{\n "questUpdate": {"action":"set"|"update"|"complete"|"none","title":"...","desc":"..."},\n "itemsGained": [{"name":"...","desc":"...","key":boolean}],\n "itemsLost": ["exact name", ...],\n "characterUpdates": [{"name":"...","present":true|false,"status":"ally|hostile|neutral|unknown|romantic|deceased|other or null","note":"short one-line description/relationship, or null","role":"short stable descriptor of their occupation/role/abilities, or null","alsoKnownAs":"an ADDITIONAL name/alias for this character being genuinely revealed or established this turn (e.g. a hero's civilian identity, or vice versa) \u2014 both names remain valid and may both be used going forward; or null","replaces":"exact prior name from the Known characters list above, ONLY if this character was previously tracked under a different name or generic placeholder (e.g. 'Rescued Hostage') and has now been properly identified as the same individual \u2014 else null"}]\n}\nRules: For questUpdate \u2014 use "set" ONLY when there was no active quest and a brand-new one is being established. Use "update" when the ALREADY-active quest's specifics, title, or immediate objective are being refined/progressed but it is fundamentally the same overarching goal \u2014 do NOT use "set" for this, that incorrectly signals a brand new quest to the player. Use "complete" when the active quest has just been fully resolved. Use "none" if nothing quest-related changed. Don't invent goals from flavor text alone. Only list itemsGained if something tangible was NEWLY acquired this turn \u2014 never for gear that is part of the Tools of the Trade kit above (that kit is always already carried, mentioning it again is not a new pickup). Only list itemsLost if something was clearly consumed, destroyed, given away, lost, or stolen. key=true only for plot-critical, irreplaceable items.\nFor characterUpdates: include a named, significant character (not background extras) whenever they are present in this scene OR clearly just left/exited it. Only reference characters from the Known characters list, or genuinely new characters actually appearing in THIS narration \u2014 never reuse a name from the Known characters list for an unrelated new character just because it happens to be listed as "known". Set "present" to true if they are in the scene right now, false if they just departed. ONLY set "status" and "note" if something about the character's relationship, disposition, or situation actually changed this turn \u2014 otherwise leave them as null so their prior relationship/description is preserved untouched. NEVER use status or note to describe mere absence (e.g. never write "not present" as a status or note) \u2014 absence is communicated only via "present":false. Use "replaces" to merge a newly-identified character with their prior placeholder entry instead of creating a duplicate. Use "role" to record a STABLE descriptor of who/what this character fundamentally is \u2014 their occupation, position, or abilities (e.g. "Academy student", "History teacher", "City Watch detective") \u2014 and ONLY set it the first time this is established, or if it is later revealed to be genuinely different than previously understood; leave it null on every other turn so it is never overwritten by a description of their current action or last appearance. Do not conflate "role" with "note" \u2014 "note" is for relationship/situation/what just happened, "role" is for their enduring identity. If a known character's role is listed as "unknown" above and this narration provides or clearly implies information that would establish it \u2014 even if this isn't their first appearance \u2014 set "role" now to fill that gap. Use "alsoKnownAs" when a character is revealed to have a second, ongoing identity that will continue to be used alongside their current name (e.g. a hero's secret identity) \u2014 both names stay valid and remain displayed together; this is NOT the same as "replaces", which is only for fully retiring a placeholder label (like "Rescued Hostage") that was never really a name in the first place. When referencing an existing character via "name" or "replaces", use exactly ONE of their individual known names \u2014 never a combined form, and never text like "[also known as: ...]" (that bracketed text is display formatting only, never a real name to echo back).`;
-    const raw = await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",500);
+    const raw = await callClaude([{role:"user",content:prompt}],"Respond ONLY with raw JSON, no markdown.",1000);
     const parsed = parseJSON(raw,{questUpdate:{action:"none"},itemsGained:[],itemsLost:[],characterUpdates:[]});
 
     if(parsed.questUpdate && (parsed.questUpdate.action==="set" || parsed.questUpdate.action==="update")){
@@ -2793,7 +3009,7 @@ async function runStep(coreFn,retryKind,retryPayload,replaceIdx){
 async function narratorTurnCore(action){
   await runRulebookTurn(typeof action==="string"?action:"");
   const pInfo=playerInfo(typeof action==="string"?action:"");
-  const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and the rulebook state (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the rulebook state (meter levels that hinder or help the player), using this same single modifier tier. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true));
+  const raw=await callClaude([...S.history,{role:"user",content:`Player action: "${action}"\n\nConsider the player's carried items/gear, described skills/background, and the rulebook state (given in the system context) when evaluating this action. Decide ONE of:\n- "narrative": no real stakes (looking, walking, simple talk) \u2014 just continue the story.\n- "item_resolution": the action plausibly and directly resolves itself by expending ONE specific general item the player carries (e.g. using a bandage to tend a wound) \u2014 no challenge needed. Only use this if a specific carried general item is clearly suited and would reasonably be used up by this exact action. Key items and Tools of the Trade are never expended this way.\n- "challenge": meaningful stakes exist (combat, persuasion, stealth, danger, deception, magic, etc).\n\nFor "challenge", assess whether the player's gear/skills favor success, work against them, both (which cancel out to neutral), or neither \u2014 and also factor in the rulebook state (meter levels that hinder or help the player), using this same single modifier tier. Multiple favorable or unfavorable factors never stack beyond a single tier.\n\nRaw JSON only:\n{"resolution":"narrative"|"item_resolution"|"challenge","narrative":"continuation text for narrative/item_resolution, ending open with no player dialogue/actions written, or null for challenge","itemExpended":"exact carried item name for item_resolution, else null","modifier":"favorable"|"unfavorable"|"neutral","reason":"short phrase shown to the player explaining the modifier, or null if neutral"}`}],buildSystem(S.mood,S.setting,S.engine,pInfo,true),1500);
   const parsed=parseJSON(raw,null);
   if(!parsed || typeof parsed!=="object" || !parsed.resolution){
     if(looksLikeDecline(raw)){
@@ -3331,6 +3547,9 @@ function renderSettingsModalHtml(){
       <select id="targetProviderInput" style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;background:var(--iBg);border:1px solid var(--bdrM);border-radius:4px;color:var(--text)">${providerOptions}</select>
       <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">Model <span style="text-transform:none;opacity:0.8">(optional override)</span></label>
       <input id="targetModelInput" type="text" autocomplete="off" spellcheck="false" placeholder="${attr(modelPlaceholder)}" value="${attr(S.targetForm.model)}" style="width:100%;box-sizing:border-box;font-size:13px"/>
+      <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">Min. delay between requests <span style="text-transform:none;opacity:0.8">(ms, optional)</span></label>
+      <input id="targetDelayInput" type="number" min="0" max="60000" step="100" inputmode="numeric" autocomplete="off" placeholder="${attr(String(API_DEFAULT_GAP_MS[S.targetForm.provider]||0))} (default for this service)" value="${attr(S.targetForm.minDelay||"")}" style="width:100%;box-sizing:border-box;font-size:13px"/>
+      <div style="font-size:10px;color:var(--textD);margin-top:-4px">Spaces this API's requests apart. Raise it if a free tier keeps answering "rate limited"; 0 disables spacing. Busy/rate-limit replies are retried automatically either way.</div>
       <label style="font-size:10px;color:var(--textD);letter-spacing:1px;text-transform:uppercase">API Key <span style="text-transform:none;opacity:0.8">(optional)</span></label>
       <div style="display:flex;gap:6px">
         <input id="targetKeyInput" type="${S.apiKeyVisible?"text":"password"}" autocomplete="off" spellcheck="false" placeholder="leave blank if not required" value="${attr(S.targetForm.key)}" style="flex:1;box-sizing:border-box;font-size:13px"/>
@@ -3379,7 +3598,7 @@ function updateSettingsModal(){
 }
 function blankTargetForm(){
   const url = API_CONFIG.defaultUrl;
-  return {name:"", url, provider: detectProviderId(url) || "", model:"", key:"", _lastDetectedUrl:url};
+  return {name:"", url, provider: detectProviderId(url) || "", model:"", key:"", minDelay:"", _lastDetectedUrl:url};
 }
 function openSettingsModal(){
   S.settingsOpen = true;
@@ -3397,7 +3616,7 @@ function openEditTargetForm(id){
   const t=S.apiTargets.find(x=>x.id===id);
   if(!t) return;
   S.settingsMode="form"; S.editingTargetId=id;
-  S.targetForm={name:t.name, url:t.url, provider:t.provider||"", model:t.model||"", key:t.key, _lastDetectedUrl:t.url};
+  S.targetForm={name:t.name, url:t.url, provider:t.provider||"", model:t.model||"", key:t.key, minDelay:(typeof t.minDelayMs==="number"?String(t.minDelayMs):""), _lastDetectedUrl:t.url};
   updateSettingsModal();
   setTimeout(()=>{ const el=document.getElementById("targetNameInput"); if(el) el.focus(); },30);
 }
@@ -4165,10 +4384,11 @@ document.addEventListener("DOMContentLoaded", function(){
         const provider=providerEl?providerEl.value:"";
         const model=modelEl?modelEl.value:"";
         const key=keyEl?keyEl.value:"";
+        const delayEl=document.getElementById("targetDelayInput"); const minDelay=delayEl?delayEl.value:"";
         if(!provider) break; // Service Type is required (button is disabled for this too, but don't trust that alone)
         const editingId = el.dataset.editingId || null;
         setState(s=>{
-          const id = addOrUpdateTarget(editingId, name, url, provider, model, key);
+          const id = addOrUpdateTarget(editingId, name, url, provider, model, key, minDelay);
           if(!s.activeTargetId) s.activeTargetId = id; // first target ever added becomes active automatically
           s.settingsMode="list";
           s.editingTargetId=null;
@@ -4289,6 +4509,8 @@ document.addEventListener("DOMContentLoaded", function(){
       S.targetForm.key = e.target.value;
     } else if(e.target.id==="targetModelInput"){
       S.targetForm.model = e.target.value;
+    } else if(e.target.id==="targetDelayInput"){
+      S.targetForm.minDelay = e.target.value;
     }
   });
 
